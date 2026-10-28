@@ -1,0 +1,46 @@
+<div class="app">
+  <header class="kopf">
+    <div class="standort">
+      <div class="umschalter" role="radiogroup" aria-label="Standort" id="standort">
+        <button type="button" role="radio" aria-checked="true" data-standort="segeberg" id="st-segeberg">Segeberg</button>
+        <button type="button" role="radio" aria-checked="false" data-standort="pinneberg" id="st-pinneberg">Pinneberg</button>
+      </div>
+      <span class="regel" id="regel"></span>
+    </div>
+    <button type="button" class="knopf" id="btn-oeffnen">Dateien öffnen …</button>
+  </header>
+
+  <div class="update" id="update" hidden>
+    <span id="update-text"></span>
+    <button type="button" class="knopf" id="btn-update">Jetzt aktualisieren</button>
+  </div>
+
+  <main class="inhalt">
+    <section class="leer" id="leer">
+      <p class="leer-titel">Leistungsnachweise hierher ziehen</p>
+      <p class="leer-text">PDF-Dateien, ein Ordner oder die ZIP-Datei aus Kilanka</p>
+    </section>
+
+    <section class="arbeit" id="arbeit" hidden>
+      <div class="liste">
+        <div class="liste-kopf" aria-hidden="true">
+          <span>Nachweis</span><span>Direkt</span><span>Indirekt</span><span>Gesamt</span>
+        </div>
+        <div class="liste-inhalt" id="liste" role="listbox" aria-label="Nachweise"></div>
+      </div>
+      <div class="detail">
+        <div class="detail-kopf" id="detail-kopf"></div>
+        <div class="vorschau" id="vorschau"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="fuss">
+    <span class="status" id="status" role="status"></span>
+    <button type="button" class="link" id="btn-zeigen" hidden>Im Ordner zeigen</button>
+    <span class="version" id="version"></span>
+    <button type="button" class="knopf" id="btn-leeren" hidden>Liste leeren</button>
+    <button type="button" class="knopf haupt" id="btn-speichern" disabled>Speichern</button>
+  </footer>
+</div>
+<input type="file" id="datei-eingabe" multiple accept=".pdf,.zip,application/pdf,application/zip" hidden>

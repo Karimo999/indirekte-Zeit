@@ -1,0 +1,21 @@
+{
+  "name": "indirekte-zeit",
+  "version": "1.1.0",
+  "description": "Trägt indirekte Stunden und Gesamtstunden in Kilanka-Leistungsnachweise ein",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/run.mjs",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "pdfjs-dist": "4.10.38"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
+    "esbuild": "^0.25.0"
+  }
+}

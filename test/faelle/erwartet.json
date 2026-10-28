@@ -1,0 +1,387 @@
+{
+ "01_muster_sept.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 19,
+    "direkt": "117,83",
+    "indirekt": "3,80",
+    "gesamt": "121,63",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "130,85"
+    }
+   }
+  ]
+ },
+ "02_summe_okt.pdf": {
+  "variant": "summe",
+  "nachweise": [
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ },
+ "03_mehrseitig_nov.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 21,
+    "direkt": "114,25",
+    "indirekt": "4,20",
+    "gesamt": "118,45",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "127,27"
+    }
+   }
+  ]
+ },
+ "04_sammel_3_nachweise.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 19,
+    "direkt": "117,83",
+    "indirekt": "3,80",
+    "gesamt": "121,63",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "130,85"
+    }
+   },
+   {
+    "tage": 7,
+    "direkt": "23,33",
+    "indirekt": "1,40",
+    "gesamt": "24,73",
+    "pinneberg": {
+     "indirekt": "4,67",
+     "gesamt": "28,00"
+    }
+   },
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ },
+ "05_alle_tage_feb.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 15,
+    "direkt": "67,50",
+    "indirekt": "3,00",
+    "gesamt": "70,50",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "80,52"
+    }
+   }
+  ]
+ },
+ "06_bereits_gefuellt.pdf": {
+  "variant": "gefuellt",
+  "nachweise": [
+   {
+    "tage": 19,
+    "direkt": "117,83",
+    "indirekt": "3,80",
+    "gesamt": "121,63",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "130,85"
+    }
+   }
+  ]
+ },
+ "07_alt_nur_summe.pdf": {
+  "variant": "alt",
+  "nachweise": [
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ },
+ "08_umbruch_gesamt_s2.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 23,
+    "direkt": "130,75",
+    "indirekt": "4,60",
+    "gesamt": "135,35",
+    "pinneberg": {
+     "indirekt": "13,71",
+     "gesamt": "144,46"
+    }
+   }
+  ]
+ },
+ "09_umbruch_indirekt_s2.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 24,
+    "direkt": "135,75",
+    "indirekt": "4,80",
+    "gesamt": "140,55",
+    "pinneberg": {
+     "indirekt": "14,14",
+     "gesamt": "149,89"
+    }
+   }
+  ]
+ },
+ "10_zwei_seiten.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 32,
+    "direkt": "179,50",
+    "indirekt": "6,40",
+    "gesamt": "185,90",
+    "pinneberg": {
+     "indirekt": "19,29",
+     "gesamt": "198,79"
+    }
+   }
+  ]
+ },
+ "11_pinneberg_65_1.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 13,
+    "direkt": "65,10",
+    "indirekt": "2,60",
+    "gesamt": "67,70",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "78,12"
+    }
+   }
+  ]
+ },
+ "12_pinneberg_70.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 14,
+    "direkt": "70,00",
+    "indirekt": "2,80",
+    "gesamt": "72,80",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "83,02"
+    }
+   }
+  ]
+ },
+ "13_teilmonat.pdf": {
+  "variant": "muster",
+  "nachweise": [
+   {
+    "tage": 8,
+    "direkt": "40,00",
+    "indirekt": "1,60",
+    "gesamt": "41,60",
+    "pinneberg": {
+     "indirekt": "6,86",
+     "gesamt": "46,86"
+    }
+   }
+  ]
+ },
+ "14_strich_in_feldern.pdf": {
+  "variant": "strich",
+  "nachweise": [
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ },
+ "15_andere_beschriftung.pdf": {
+  "variant": "labels2",
+  "nachweise": [
+   {
+    "tage": 19,
+    "direkt": "117,83",
+    "indirekt": "3,80",
+    "gesamt": "121,63",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "130,85"
+    }
+   }
+  ]
+ },
+ "16_freitext_unterstriche.pdf": {
+  "variant": "frei",
+  "nachweise": [
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ },
+ "17_einfuegen_zwei_seiten.pdf": {
+  "variant": "alt",
+  "nachweise": [
+   {
+    "tage": 32,
+    "direkt": "179,50",
+    "indirekt": "6,40",
+    "gesamt": "185,90",
+    "pinneberg": {
+     "indirekt": "19,29",
+     "gesamt": "198,79"
+    }
+   }
+  ]
+ },
+ "18_einfuegen_sammel.pdf": {
+  "variant": "alt",
+  "nachweise": [
+   {
+    "tage": 19,
+    "direkt": "117,83",
+    "indirekt": "3,80",
+    "gesamt": "121,63",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "130,85"
+    }
+   },
+   {
+    "tage": 7,
+    "direkt": "23,33",
+    "indirekt": "1,40",
+    "gesamt": "24,73",
+    "pinneberg": {
+     "indirekt": "4,67",
+     "gesamt": "28,00"
+    }
+   },
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ },
+ "19_einfuegen_volle_breite.pdf": {
+  "variant": "alt",
+  "nachweise": [
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ },
+ "20_einfuegen_seitenende.pdf": {
+  "variant": "alt",
+  "nachweise": [
+   {
+    "tage": 23,
+    "direkt": "130,75",
+    "indirekt": "4,60",
+    "gesamt": "135,35",
+    "pinneberg": {
+     "indirekt": "13,71",
+     "gesamt": "144,46"
+    }
+   }
+  ]
+ },
+ "21_kein_platz.pdf": {
+  "variant": "kein_platz",
+  "nachweise": [
+   {
+    "tage": 24,
+    "direkt": "135,75",
+    "indirekt": "4,80",
+    "gesamt": "140,55",
+    "pinneberg": {
+     "indirekt": "14,14",
+     "gesamt": "149,89"
+    }
+   }
+  ]
+ },
+ "22_pinneberg_einfuegen.pdf": {
+  "variant": "alt",
+  "nachweise": [
+   {
+    "tage": 14,
+    "direkt": "70,00",
+    "indirekt": "2,80",
+    "gesamt": "72,80",
+    "pinneberg": {
+     "indirekt": "13,02",
+     "gesamt": "83,02"
+    }
+   }
+  ]
+ },
+ "kilanka_aktuell_ohne_felder.pdf": {
+  "variant": "alt",
+  "nachweise": [
+   {
+    "tage": 7,
+    "direkt": "30,83",
+    "indirekt": "1,40",
+    "gesamt": "32,23",
+    "pinneberg": {
+     "indirekt": "6,17",
+     "gesamt": "37,00"
+    }
+   }
+  ]
+ }
+}

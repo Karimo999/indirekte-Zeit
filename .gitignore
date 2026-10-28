@@ -1,0 +1,15 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+# echte Leistungsnachweise niemals einchecken
+test/faelle/kilanka_*.pdf
+*.key
+*.key.pub
+.DS_Store
+Thumbs.db
+tools/testgen/out/
+tools/testgen/variants/
+tools/testgen/ergebnisse/
+tools/testgen/data_*.json
+tools/testgen/__pycache__/
