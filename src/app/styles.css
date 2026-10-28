@@ -157,5 +157,9 @@ button { font: inherit; color: inherit; }
 @media (max-width: 760px) {
   .arbeit { flex-direction: column; }
   .liste { width: auto; max-width: none; min-width: 0; max-height: 45%; border-right: 0; border-bottom: 1px solid var(--linie); }
-  .regel { display: none; }
+  .regel, .version { display: none; }
+  .fuss { flex-wrap: wrap; }
+  .status { flex: 1 1 100%; }
+  .status:empty { display: none; }
+  #btn-leeren { margin-left: auto; }
 }
