@@ -1,8 +1,10 @@
 // Zeitnachweis eines Mitarbeiters (Excel-Export aus Kilanka): indirekte Stunden fuer das Stundenkonto.
-// Gezaehlt werden Eintraege mit Klient; die Regeln sind dieselben wie beim Leistungsnachweis (STANDORTE),
-// angewendet je Klient: Segeberg 12 Min. pro Tag mit Klient, Pinneberg 20 % mit Obergrenze.
+// Gezaehlt werden Eintraege mit Klient (ein Eintrag mit Klient ist ein Klienteneinsatz):
+//   Segeberg: 12 Min. pro Eintrag mit Klient
+//   Pinneberg: 20 % der Stunden je Klient, Obergrenze (3 Std./Woche, 13,02 Std./Monat) je Klient
+//              und zusaetzlich fuer den Mitarbeiter insgesamt
 import { leseXlsx } from './xlsx.js';
-import { Tag, DE, standortById, anwesenheitstage } from './nachweis.js';
+import { Tag, DE, standortById, anwesenheitstage, pinnebergGrenze } from './nachweis.js';
 
 const norm = (v) => String(v ?? '').trim().toLowerCase().replace(/[:.]+$/, '').replace(/\s+/g, ' ');
 const leer = (v) => v === undefined || v === null || String(v).trim() === '';
@@ -128,14 +130,27 @@ export function berechneZeitnachweis(zn, standortId) {
       eintraege: liste.map((e) => ({ tag: e.tag, minuten: e.minuten, stunden: DE.centiFromMinutes(e.minuten) })),
     };
     const direkt = DE.centiFromMinutes(liste.reduce((s, e) => s + e.minuten, 0));
-    const ind = st.berechne(n, direkt);
+    let ind;
+    if (st.id === 'segeberg') {
+      // jeder Eintrag mit Klient ist ein Einsatz
+      ind = { centi: liste.length * 20, formel: `${liste.length} ${liste.length === 1 ? 'Eintrag' : 'Einträge'} × 12 Min.` };
+    } else ind = st.berechne(n, direkt);
     klienten.push({ name, eintraege: liste.length, tage: anwesenheitstage(n).length, direkt, indirekt: ind.centi, formel: ind.formel });
   }
   klienten.sort((a, b) => a.name.localeCompare(b.name, 'de'));
   const direkt = klienten.reduce((s, k) => s + k.direkt, 0);
-  const indirekt = klienten.reduce((s, k) => s + k.indirekt, 0);
+  let indirekt = klienten.reduce((s, k) => s + k.indirekt, 0);
+  // Pinneberg: Obergrenze gilt auch fuer den Mitarbeiter insgesamt
+  let kappung = null;
+  if (st.id === 'pinneberg') {
+    const { grenze, text } = pinnebergGrenze({ zeitraum: zn.zeitraum });
+    if (indirekt > grenze) {
+      kappung = { vorher: indirekt, grenze, text };
+      indirekt = grenze;
+    }
+  }
   return {
-    klienten, direkt, indirekt, gesamt: direkt + indirekt, ohneKlient,
+    klienten, direkt, indirekt, gesamt: direkt + indirekt, ohneKlient, kappung,
     eintraegeMitKlient: klienten.reduce((s, k) => s + k.eintraege, 0),
     indirektText: DE.format(indirekt),
   };

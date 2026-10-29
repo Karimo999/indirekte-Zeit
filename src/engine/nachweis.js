@@ -378,7 +378,8 @@ export const STANDORTE = [
 export const standortById = (id) => STANDORTE.find((s) => s.id === id) || STANDORTE[0];
 
 /** Volle Monate: 13,02 Std. je Monat. Teilzeitraeume: 3 Std. pro Woche, anteilig (hoechstens 13,02 je Monat). */
-function pinnebergGrenze(n) {
+/** Obergrenze Pinneberg fuer einen Zeitraum: 13,02 Std. je vollem Monat, sonst 3 Std. pro Woche anteilig */
+export function pinnebergGrenze(n) {
   const r = n.zeitraum ? Tag.parseRange(n.zeitraum) : null;
   if (!r || r[0].ordinal > r[1].ordinal) return { grenze: 1302, text: 'Monatsgrenze' };
   const [von, bis] = r;

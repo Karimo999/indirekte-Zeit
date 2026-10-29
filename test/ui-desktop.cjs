@@ -40,6 +40,7 @@ const DATEIEN = {
   'C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Max.xlsx': b64('zeitnachweis_schulbegleiter_max_2026-09.xlsx'),
   'C:\\Users\\Moritz\\Downloads\\Max_September.pdf': b64('01_muster_sept.pdf'),
   'C:\\Users\\Moritz\\Downloads\\Tabelle.xlsx': Buffer.from('PK kaputt').toString('base64'),
+  'C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Volker.xlsx': b64('zeitnachweis_viel_volker_2026-10.xlsx'),
 };
 const ORDNER = { 'C:\\Users\\Moritz\\Downloads\\Kilanka': ['C:\\Users\\Moritz\\Downloads\\Kilanka\\A.pdf', 'C:\\Users\\Moritz\\Downloads\\Kilanka\\B.pdf'] };
 
@@ -227,6 +228,16 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     await page.waitForTimeout(1500);
     const zp = await zeilen(page);
     pruefe(zp[0].includes('6,17') && zp[0].includes('37,00'), 'Pinneberg: 6,17 / 37,00');
+    // Pinneberg-Grenze auch je Mitarbeiter: Tina hat zwei Nachweise (14,14 + 19,29) im Zeitraum 02.03.–15.04.
+    await page.click('#ans-mitarbeiter');
+    await page.waitForTimeout(300);
+    const zpm = await zeilen(page);
+    const tina = zpm.findIndex((z) => z.startsWith('Fachkraft, Tina'));
+    pruefe(tina >= 0 && zpm[tina].includes('19,29'), `Pinneberg: Grenze je Mitarbeiter (${zpm[tina]})`);
+    await page.click(`.zeile >> nth=${tina}`);
+    pruefe((await page.textContent('#ma-detail')).includes('Zusammen 33,43 Std. – für den Mitarbeiter höchstens 19,29 Std.'), 'Hinweis auf die Grenze je Mitarbeiter');
+    await page.click('#ans-nachweise');
+    await page.waitForTimeout(600);
     pruefe(!(await page.isDisabled('#btn-speichern')), 'nach Standortwechsel wieder speicherbar');
     await page.screenshot({ path: path.join(OUT, `${schema}-7-pinneberg.png`) });
 
@@ -272,16 +283,24 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     pruefe((await page.getAttribute('#ans-mitarbeiter', 'aria-checked')) === 'true', 'nur Excel abgelegt -> Ansicht Mitarbeiter');
     let zx = await zeilen(page);
     console.log('EXCEL:\n' + zx.join('\n'));
-    pruefe(zx.length === 1 && zx[0].startsWith('Muster, Mia | September 2026 · Zeitnachweis') && zx[0].includes('1,60'), 'Zeitnachweis Segeberg 1,60');
+    pruefe(zx.length === 1 && zx[0].startsWith('Muster, Mia | September 2026 · Zeitnachweis') && zx[0].includes('1,80'), 'Zeitnachweis Segeberg 1,80 (12 Min. pro Eintrag mit Klient)');
     let bx = await page.$$eval('.buchung tr', (trs) => trs.map((t) => [...t.children].slice(0, 2).map((c) => c.textContent).join('=')));
-    pruefe(bx.join('|') === 'Stichtag=30.09.2026|Buchungswert=1,60|Bemerkung=Indirekte Zeit September 2026', 'Buchungswerte aus dem Zeitnachweis');
+    pruefe(bx.join('|') === 'Stichtag=30.09.2026|Buchungswert=1,80|Bemerkung=Indirekte Zeit September 2026', 'Buchungswerte aus dem Zeitnachweis');
     const mdx = await page.textContent('#ma-detail');
-    pruefe(mdx.includes('Kind, Anton · 1,00 Std.') && mdx.includes('Kind, Berta · 0,60 Std.') && mdx.includes('3 Einträge ohne Klient'), 'Aufschlüsselung je Klient');
+    pruefe(mdx.includes('Kind, Anton · 1,20 Std.') && mdx.includes('6 Einträge × 12 Min.') && mdx.includes('Kind, Berta · 0,60 Std.') && mdx.includes('3 Einträge ohne Klient'), 'Aufschlüsselung je Klient');
     await page.screenshot({ path: path.join(OUT, `${schema}-9-zeitnachweis.png`) });
     await page.click('#st-pinneberg');
     await page.waitForTimeout(300);
     zx = await zeilen(page);
     pruefe(zx[0].includes('7,43'), 'Zeitnachweis Pinneberg 7,43');
+    await page.click('#btn-leeren');
+    await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Volker.xlsx']);
+    await page.waitForTimeout(600);
+    zx = await zeilen(page);
+    pruefe(zx[0].startsWith('Viel, Volker') && zx[0].includes('13,02') && (await page.textContent('#ma-detail')).includes('Zusammen 26,04 Std.'), 'Zeitnachweis Pinneberg: Grenze für den Mitarbeiter (26,04 → 13,02)');
+    await page.click('#btn-leeren');
+    await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Muster_Mia.xlsx']);
+    await page.waitForTimeout(600);
     await page.click('#st-segeberg');
     await page.click('#ans-nachweise');
     pruefe((await page.textContent('#liste')).includes('Keine Leistungsnachweise geladen'), 'Nachweis-Ansicht weist auf die Zeitnachweise hin');

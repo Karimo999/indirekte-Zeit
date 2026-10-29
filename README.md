@@ -11,7 +11,7 @@ Die Leistungsnachweise werden nur auf dem eigenen Rechner verarbeitet. Es wird n
 | Standort | Indirekte Stunden |
 |---|---|
 | Segeberg | 12 Minuten pro Anwesenheitstag (Tag mit gebuchten Stunden; mehrere Einträge am selben Tag zählen als ein Tag) |
-| Pinneberg | 20 % der direkten Stunden, höchstens 3 Std. pro Woche und höchstens 13,02 Std. im Monat |
+| Pinneberg | 20 % der direkten Stunden, höchstens 3 Std. pro Woche und höchstens 13,02 Std. im Monat – die Grenze gilt je Klient und zusätzlich für den Mitarbeiter insgesamt |
 
 Gesamtstunden = direkte Stunden aus dem Nachweis + indirekte Stunden. Alle Werte in Dezimalstunden mit
 zwei Nachkommastellen, kaufmännisch gerundet.
@@ -30,8 +30,9 @@ zwei Nachkommastellen, kaufmännisch gerundet.
    zum Kopieren). Derselbe Nachweis in mehreren Dateien wird nur einmal gezählt.
 
 5. **Zeitnachweise (Excel):** Den Zeitnachweis eines Mitarbeiters aus Kilanka (Excel-Export) einfach mit
-   ablegen. Die App zählt alle Einträge mit Klient und rechnet die indirekten Stunden je Klient nach den
-   Regeln des Standorts (Segeberg: 12 Min. pro Tag mit Klient; Pinneberg: 20 % mit Obergrenze). Das Ergebnis
+   ablegen. Die App zählt alle Einträge mit Klient (ein Eintrag mit Klient ist ein Klienteneinsatz) und rechnet
+   die indirekten Stunden nach den Regeln des Standorts (Segeberg: 12 Min. pro Eintrag mit Klient; Pinneberg:
+   20 % je Klient, Obergrenze je Klient und für den Mitarbeiter insgesamt). Das Ergebnis
    steht unter **Mitarbeiter**, mit Stichtag, Buchungswert und Bemerkung zum Kopieren. Ist für denselben
    Mitarbeiter und Monat auch ein Leistungsnachweis geladen, zählt nur der Zeitnachweis.
 

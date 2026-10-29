@@ -53,7 +53,7 @@ try {
   await wd('POST', `${S}/window/rect`, { width: 1280, height: 800 }).catch(() => {});
   await sleep(2500);
 
-  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.3.0', 'Version aus der App');
+  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.4.0', 'Version aus der App');
   await bild('1-start.png');
   // die App merkt sich den Standort – fuer den Test immer mit Segeberg beginnen
   await js('document.getElementById("st-segeberg").click()');

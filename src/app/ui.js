@@ -1,7 +1,7 @@
 // Oberflaeche von „Indirekte Zeit“ – gemeinsam fuer die Desktop-App und die Testversion im Browser.
 // Plattformabhaengiges (Dateien oeffnen/speichern, Updates) kommt ueber das Objekt `p`.
 import { unzipSync } from 'fflate';
-import { verarbeite, STANDORTE, standortById, DE } from '../engine/nachweis.js';
+import { verarbeite, STANDORTE, standortById, DE, Tag, pinnebergGrenze } from '../engine/nachweis.js';
 import { leseZeitnachweis, berechneZeitnachweis } from '../engine/zeitnachweis.js';
 
 export const SUFFIX = '_ergaenzt';
@@ -36,7 +36,7 @@ function endeDatum(zeitraum) {
  * Indirekte Stunden je Mitarbeiter (betreuende Fachkraft laut Nachweis) und Monat –
  * fuer die manuelle Buchung im Stundenkonto in Kilanka.
  */
-export function mitarbeiterGruppen(dateien) {
+export function mitarbeiterGruppen(dateien, standortId) {
   const gruppen = new Map();
   const gesehen = new Map(); // gleicher Nachweis in mehreren Dateien (z. B. Original und _ergaenzt) nur einmal zaehlen
   for (const d of dateien) {
@@ -64,6 +64,11 @@ export function mitarbeiterGruppen(dateien) {
       g.indirekt += n.indirekt;
       g.gesamt += n.gesamt || 0;
       g.nachweise.push({ d, n });
+      const r = n.zeitraum ? Tag.parseRange(n.zeitraum) : null;
+      if (r) {
+        if (!g.von || r[0].key < g.von.key) g.von = r[0];
+        if (!g.bis || r[1].key > g.bis.key) g.bis = r[1];
+      }
       if (ende && ende.wert > g.stichtagWert) { g.stichtagWert = ende.wert; g.stichtag = ende.text; }
     }
   }
@@ -92,7 +97,20 @@ export function mitarbeiterGruppen(dateien) {
     g.direkt += d.zn.direkt;
     g.indirekt += d.zn.indirekt;
     g.gesamt += d.zn.gesamt;
+    if (d.zn.kappung) g.kappung = d.zn.kappung;
     if (ende.wert > g.stichtagWert) { g.stichtagWert = ende.wert; g.stichtag = ende.text; }
+  }
+  // Pinneberg: die Obergrenze gilt auch fuer den Mitarbeiter insgesamt (Zeitraum aller seiner Nachweise im Monat)
+  if (standortId === 'pinneberg') {
+    for (const g of gruppen.values()) {
+      if (!g.von || !g.bis) continue;
+      const { grenze, text } = pinnebergGrenze({ zeitraum: `${g.von} - ${g.bis}` });
+      if (g.indirekt > grenze) {
+        g.kappung = { vorher: g.indirekt, grenze, text };
+        g.gesamt -= g.indirekt - grenze;
+        g.indirekt = grenze;
+      }
+    }
   }
   for (const [key, g] of ausExcel) {
     const pdf = gruppen.get(key);
@@ -193,7 +211,7 @@ export function starte(p) {
     const excel = state.dateien.length - pdfs.length;
     if (!state.dateien.length) return status('');
     if (state.ansicht === 'mitarbeiter') {
-      const g = mitarbeiterGruppen(state.dateien);
+      const g = mitarbeiterGruppen(state.dateien, state.standort);
       return status(g.length ? `${anzahl(new Set(g.map((x) => x.fachkraft)).size, 'Mitarbeiter', 'Mitarbeiter')} · zusammen ${DE.format(g.reduce((s, x) => s + x.indirekt, 0))} Std. indirekt` : '');
     }
     const fehler = alle.filter((n) => !n || n.status === 'fehler').length;
@@ -386,7 +404,7 @@ export function starte(p) {
   }
 
   function renderMitarbeiter() {
-    const gruppen = mitarbeiterGruppen(state.dateien);
+    const gruppen = mitarbeiterGruppen(state.dateien, state.standort);
     if (!gruppen.some((g) => g.key === state.maAuswahl)) state.maAuswahl = gruppen.length ? gruppen[0].key : null;
     const liste = $('liste');
     liste.replaceChildren();
@@ -434,6 +452,9 @@ export function starte(p) {
     zeile('Buchungswert', DE.format(g.indirekt));
     zeile('Bemerkung', `Indirekte Zeit ${g.monatText}`);
     box.append(tabelle);
+    if (g.kappung) {
+      box.append(el('p', 'leise', `Zusammen ${DE.format(g.kappung.vorher)} Std. – für den Mitarbeiter höchstens ${DE.format(g.kappung.grenze)} Std. (${g.kappung.text}).`));
+    }
     box.append(el('p', 'abschnitt', 'Zusammensetzung'));
     const ul = el('ul', 'ma-liste');
     for (const { d, zn } of g.zeitnachweise || []) {

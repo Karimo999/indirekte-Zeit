@@ -42,9 +42,10 @@ def erwartung(eintraege, von, bis):
             grenze = 1302
     seg = pin = 0
     for k, liste in klienten.items():
-        seg += len({d for d, _ in liste}) * 20
+        seg += len(liste) * 20  # Segeberg: 12 Min. pro Eintrag mit Klient
         direkt = centi(sum(m for _, m in liste))
-        pin += min(rhu(direkt, 5), grenze)
+        pin += min(rhu(direkt, 5), grenze)  # Pinneberg: Grenze je Klient ...
+    pin = min(pin, grenze)  # ... und fuer den Mitarbeiter insgesamt
     return {'segeberg': de(seg), 'pinneberg': de(pin)}
 
 
@@ -137,8 +138,36 @@ def fall3():
     return name, {'mitarbeiter': 'Schulbegleiter, Max', 'zeitraum': '01.09.2026 - 30.09.2026', 'klienten': 1, **e}
 
 
+def fall4():
+    """zwei Klienten mit vielen Stunden: Pinneberg-Grenze fuer den Mitarbeiter insgesamt greift"""
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Zeitnachweis'
+    ws['A1'] = 'Mitarbeiter:'; ws['C1'] = 'Viel, Volker'
+    ws['A2'] = 'Von:'; ws['C2'] = '01.10.2026'
+    ws['A3'] = 'Bis:'; ws['C3'] = '31.10.2026'
+    for i, h in enumerate(['Datum', 'Arbeitszeit', 'Nachtanteil', 'Pause', 'Stunden', 'Klient', 'Kommentar']):
+        ws.cell(row=5, column=i + 1, value=h)
+    eintraege = []
+    r = 6
+    tag = datetime.date(2026, 10, 1)
+    while tag.month == 10:
+        if tag.weekday() < 5:
+            for von, bis, klient in [('07:30', '12:30', 'Kind, Dora'), ('13:00', '16:00', 'Kind, Emil')]:
+                ws.cell(row=r, column=1, value=f"{tag:%d.%m.%Y} {WT[tag.weekday()]}")
+                ws.cell(row=r, column=2, value=f"{von}-{bis}")
+                m = minuten(von, bis)
+                ws.cell(row=r, column=5, value=m / 60)
+                ws.cell(row=r, column=6, value=klient)
+                eintraege.append((tag, m, klient))
+                r += 1
+        tag += datetime.timedelta(days=1)
+    name = 'zeitnachweis_viel_volker_2026-10.xlsx'
+    wb.save(os.path.join(ZIEL, name))
+    e = erwartung(eintraege, datetime.date(2026, 10, 1), datetime.date(2026, 10, 31))
+    return name, {'mitarbeiter': 'Viel, Volker', 'zeitraum': '01.10.2026 - 31.10.2026', 'klienten': 2, **e}
+
+
 if __name__ == '__main__':
-    erwartet = dict([fall1(), fall2(), fall3()])
+    erwartet = dict([fall1(), fall2(), fall3(), fall4()])
     with open(os.path.join(ZIEL, 'erwartet_zeitnachweis.json'), 'w') as f:
         json.dump(erwartet, f, ensure_ascii=False, indent=1)
     print(json.dumps(erwartet, ensure_ascii=False, indent=1))

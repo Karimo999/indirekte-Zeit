@@ -3,7 +3,7 @@
   "mitarbeiter": "Muster, Mia",
   "zeitraum": "01.09.2026 - 30.09.2026",
   "klienten": 2,
-  "segeberg": "1,60",
+  "segeberg": "1,80",
   "pinneberg": "7,43"
  },
  "zeitnachweis_beispiel_ben_teilmonat.xlsx": {
@@ -19,5 +19,12 @@
   "klienten": 1,
   "segeberg": "0,60",
   "pinneberg": "3,00"
+ },
+ "zeitnachweis_viel_volker_2026-10.xlsx": {
+  "mitarbeiter": "Viel, Volker",
+  "zeitraum": "01.10.2026 - 31.10.2026",
+  "klienten": 2,
+  "segeberg": "8,80",
+  "pinneberg": "13,02"
  }
 }
