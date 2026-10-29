@@ -121,6 +121,9 @@ button { font: inherit; color: inherit; }
 }
 .liste-kopf span:not(:first-child) { text-align: right; }
 .liste-inhalt { flex: 1; overflow-y: auto; }
+.liste-leiste { padding: 8px 16px; border-bottom: 1px solid var(--linie); }
+.umschalter.klein button { padding: 3px 12px; font-size: 12px; }
+.liste-hinweis { padding: 16px; color: var(--leise); }
 .zeile {
   width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--linie);
   background: none; padding: 9px 16px; cursor: pointer; align-items: start;
@@ -136,6 +139,19 @@ button { font: inherit; color: inherit; }
 .zahl.leise { color: var(--leise); font-weight: 400; }
 
 .detail { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ma-detail { flex: 1; overflow: auto; padding: 16px 20px; }
+.ma-detail p { margin: 0 0 2px; }
+.ma-detail .titel { font-weight: 600; font-size: 14px; }
+.ma-detail .leise { color: var(--leise); }
+.ma-detail .abschnitt { margin-top: 18px; }
+.buchung { border-collapse: collapse; margin: 10px 0 4px; }
+.buchung th { text-align: left; font-weight: 400; color: var(--leise); padding: 5px 20px 5px 0; white-space: nowrap; }
+.buchung td { padding: 5px 20px 5px 0; }
+.buchung td.wert { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ma-liste { list-style: none; margin: 6px 0 0; padding: 0; }
+.ma-liste li { padding: 7px 0; border-top: 1px solid var(--linie); }
+.ma-liste li .leise { font-size: 12px; }
+.hinweis-unten { margin-top: 18px !important; font-size: 12px; }
 .detail-kopf { padding: 10px 16px; border-bottom: 1px solid var(--linie); }
 .detail-kopf p { margin: 0; }
 .detail-kopf .titel { font-weight: 600; font-size: 14px; }

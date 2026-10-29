@@ -1,6 +1,6 @@
 [package]
 name = "indirekte-zeit"
-version = "1.1.0"
+version = "1.2.0"
 description = "Trägt indirekte Stunden und Gesamtstunden in Kilanka-Leistungsnachweise ein"
 edition = "2021"
 rust-version = "1.80"

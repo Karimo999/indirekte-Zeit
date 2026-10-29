@@ -53,8 +53,10 @@ try {
   await wd('POST', `${S}/window/rect`, { width: 1280, height: 800 }).catch(() => {});
   await sleep(2500);
 
-  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.1.0', 'Version aus der App');
+  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.2.0', 'Version aus der App');
   await bild('1-start.png');
+  // die App merkt sich den Standort – fuer den Test immer mit Segeberg beginnen
+  await js('document.getElementById("st-segeberg").click()');
 
   // Ablegen wie per Drag & Drop: gleiches Ereignis, das Tauri beim Loslassen sendet
   const ergebnis = await jsAsync(`
@@ -108,6 +110,15 @@ try {
   const zp = await js('return [...document.querySelectorAll(".zeile")].map((z) => z.innerText.replace(/\\s*\\n+\\s*/g, " | "))');
   pruefe(zp.some((z) => z.includes('Begleitkind_Oktober.pdf') && z.includes('6,17') && z.includes('37,00')), 'Pinneberg 6,17 / 37,00');
   await bild('5-pinneberg.png');
+
+  // Ansicht Mitarbeiter (Werte fuer das Stundenkonto)
+  await js('document.getElementById("ans-mitarbeiter").click()');
+  await sleep(800);
+  const ma = await js('return [...document.querySelectorAll(".zeile")].map((z) => z.innerText.replace(/\\s*\\n+\\s*/g, " | "))');
+  console.log(ma.join('\n'));
+  pruefe(ma.length >= 3 && ma.some((z) => z.startsWith('Schulbegleiter, Max | Oktober 2026')), 'Mitarbeiter-Ansicht mit Monatswerten');
+  pruefe((await js('return document.querySelector(".buchung") ? document.querySelector(".buchung").innerText : ""')).includes('Buchungswert'), 'Buchungswerte angezeigt');
+  await bild('6-mitarbeiter.png');
 } catch (e) {
   fehler++;
   console.log('ABBRUCH:', e.message);

@@ -31,6 +31,7 @@ for (const standort of ['segeberg', 'pinneberg']) {
       if (!x) return;
       if (n.anzahlTage !== x.tage) probleme.push(`Tage ${n.anzahlTage} statt ${x.tage}`);
       if (n.direktText !== x.direkt) probleme.push(`direkt ${n.direktText} statt ${x.direkt}`);
+      if (x.fachkraft && n.fachkraft !== x.fachkraft) probleme.push(`Fachkraft ${n.fachkraft} statt ${x.fachkraft}`);
       const soll = standort === 'pinneberg' && x.pinneberg ? x.pinneberg : x;
       if (soll.indirekt && n.indirektText !== soll.indirekt) probleme.push(`indirekt ${n.indirektText} statt ${soll.indirekt}`);
       if (soll.gesamt && n.gesamtText !== soll.gesamt) probleme.push(`gesamt ${n.gesamtText} statt ${soll.gesamt}`);

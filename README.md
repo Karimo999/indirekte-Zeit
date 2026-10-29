@@ -23,6 +23,14 @@ zwei Nachkommastellen, kaufmännisch gerundet.
 3. Werte prüfen, **Speichern**. Die ergänzte Datei liegt neben dem Original und heißt `…_ergaenzt.pdf`.
    Aus einer ZIP-Datei landen die Dateien im Ordner `<ZIP-Name>_ergaenzt` daneben.
 
+4. **Mitarbeiter** (Umschalter über der Liste): indirekte Stunden je betreuender Fachkraft und Monat, summiert
+   über alle geladenen Nachweise. Diese Werte gehören ins Stundenkonto in Kilanka, als manuelle Buchung:
+   **Mitarbeiter → Konten → Stundenkonto → Plus** (Stichtag, Buchungswert, Bemerkung; die App zeigt alle drei
+   zum Kopieren). Derselbe Nachweis in mehreren Dateien wird nur einmal gezählt.
+
+Kilanka lässt von außen keine Buchungen zu (API und Applets können nur lesen), deshalb ist dieser Schritt
+manuell: eine Buchung pro Mitarbeiter und Monat.
+
 Die Originaldatei bleibt unverändert. Die ergänzte Datei enthält das Original Byte für Byte plus eine
 angehängte Ergänzung. Vor dem Speichern liest die App das Ergebnis noch einmal und prüft die Werte.
 

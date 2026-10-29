@@ -186,7 +186,7 @@ export const wertText = (feld) => (feld && feld.wert ? ohneUnterstriche(feld.wer
 
 function neuerNachweis() {
   return {
-    name: null, zeitraum: null, bewilligt: null, stundenSpalte: null, stundenKopf: null, eintraege: [],
+    name: null, fachkraft: null, zeitraum: null, bewilligt: null, stundenSpalte: null, stundenKopf: null, eintraege: [],
     direkt: null, indirekt: null, gesamt: null, ersteSeite: 0, letzteSeite: 0,
   };
 }
@@ -238,6 +238,9 @@ function fuelle(e, runs, spalte) {
   }
 }
 
+/** Beschriftungen fuer die betreuende Person im Kopf des Nachweises */
+const FACHKRAFT_LABELS = ['betreuende fachkraft', 'fachkraft', 'betreuende person', 'betreuer', 'betreuerin', 'mitarbeiter', 'mitarbeiterin', 'mitarbeitende'];
+
 export function analyze(lines) {
   const result = [];
   let cur = neuerNachweis();
@@ -262,6 +265,10 @@ export function analyze(lines) {
     i = norms.findIndex((n) => n === 'leistungszeitraum' || n === 'zeitraum' || n === 'abrechnungszeitraum');
     if (i >= 0 && i + 1 < runs.length && Tag.parseAtStart(runs[i + 1].text) && cur.zeitraum === null) {
       cur.zeitraum = runs[i + 1].text;
+    }
+    i = norms.findIndex((n) => FACHKRAFT_LABELS.includes(n));
+    if (i >= 0 && i + 1 < runs.length && cur.fachkraft === null && !FACHKRAFT_LABELS.includes(norms[i + 1])) {
+      cur.fachkraft = runs[i + 1].text.trim();
     }
     i = norms.findIndex((n) => n.startsWith('bewilligte std') || n.startsWith('bewilligte stunden') || n.startsWith('bewilligte fachleistungsstunden'));
     if (i >= 0 && i + 1 < runs.length) {
@@ -842,7 +849,7 @@ export function verarbeite(data, standortId) {
   nachweise.forEach((n, i) => {
     const tage = anwesenheitstage(n);
     const r = {
-      nummer: i + 1, name: n.name, zeitraum: n.zeitraum, bewilligt: n.bewilligt, tage: tage.map(String),
+      nummer: i + 1, name: n.name, fachkraft: n.fachkraft, zeitraum: n.zeitraum, bewilligt: n.bewilligt, tage: tage.map(String),
       anzahlTage: tage.length, mehrfachTage: mehrfachTage(n).map((t) => t.kurz), eintraege: n.eintraege.length,
       direkt: null, direktText: null, indirekt: null, indirektText: null, gesamt: null, gesamtText: null,
       formel: null, status: 'bereit', fehlertext: null, hinweise: [], eingefuegt: false,

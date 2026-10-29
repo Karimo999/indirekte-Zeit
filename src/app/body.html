@@ -23,14 +23,21 @@
 
     <section class="arbeit" id="arbeit" hidden>
       <div class="liste">
+        <div class="liste-leiste">
+          <div class="umschalter klein" role="radiogroup" aria-label="Ansicht">
+            <button type="button" role="radio" aria-checked="true" id="ans-nachweise">Nachweise</button>
+            <button type="button" role="radio" aria-checked="false" id="ans-mitarbeiter">Mitarbeiter</button>
+          </div>
+        </div>
         <div class="liste-kopf" aria-hidden="true">
-          <span>Nachweis</span><span>Direkt</span><span>Indirekt</span><span>Gesamt</span>
+          <span id="kopf-name">Nachweis</span><span>Direkt</span><span>Indirekt</span><span>Gesamt</span>
         </div>
         <div class="liste-inhalt" id="liste" role="listbox" aria-label="Nachweise"></div>
       </div>
       <div class="detail">
         <div class="detail-kopf" id="detail-kopf"></div>
         <div class="vorschau" id="vorschau"></div>
+        <div class="ma-detail" id="ma-detail" hidden></div>
       </div>
     </section>
   </main>

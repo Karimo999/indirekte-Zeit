@@ -55,7 +55,7 @@ def nachweis(name, fachkraft, zeitraum, bewilligt, rows, min_per_day=12):
     return {
         "name": name, "fachkraft": fachkraft, "zeitraum": zeitraum, "bewilligt": bewilligt,
         "rows": clean, "direkt": de(direkt), "indirekt": de(indirekt), "gesamt": de(gesamt),
-        "_expect": {"tage": len(days), "direkt": de(direkt), "indirekt": de(indirekt), "gesamt": de(gesamt),
+        "_expect": {"tage": len(days), "direkt": de(direkt), "indirekt": de(indirekt), "gesamt": de(gesamt), "fachkraft": fachkraft,
                     "pinneberg": pinneberg(direkt, zeitraum)},
     }
 

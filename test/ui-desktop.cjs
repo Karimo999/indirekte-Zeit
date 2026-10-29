@@ -166,6 +166,35 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     pruefe((await page.evaluate(() => window.__mock.gezeigt)) !== undefined, 'Im Ordner zeigen aufgerufen');
     await page.screenshot({ path: path.join(OUT, `${schema}-6-gespeichert.png`) });
 
+    // Ansicht „Mitarbeiter“: indirekte Stunden je Fachkraft und Monat fuer das Stundenkonto
+    await page.click('#ans-mitarbeiter');
+    await page.waitForTimeout(300);
+    const ma = await zeilen(page);
+    console.log('MITARBEITER:\n' + ma.join('\n'));
+    pruefe(ma.length === 5, `5 Gruppen Mitarbeiter/Monat (${ma.length})`);
+    pruefe(ma[0].startsWith('Begleiterin, Anna | Februar 2026 · 1 Nachweis') && ma[0].includes('3,00'), 'Begleiterin Februar 3,00');
+    pruefe(ma[2].startsWith('Fachkraft, Tina | April 2026 · 2 Nachweise') && ma[2].includes('11,20'), 'Tina April 11,20 (inkl. nicht eingetragenem Nachweis)');
+    // Nachweis_Oktober, Sammel (3. Nachweis) und Nur_lesen enthalten denselben Nachweis -> nur einmal zaehlen
+    const okt = ma.findIndex((z) => z.startsWith('Schulbegleiter, Max | Oktober 2026'));
+    pruefe(okt >= 0 && ma[okt].includes('1,40') && ma[okt].includes('1 Nachweis'), 'Max Oktober 1,40, doppelte Nachweise nur einmal');
+    pruefe(ma.some((z) => z.startsWith('Schulbegleiter, Max | September 2026 · 1 Nachweis') && z.includes('3,80')), 'Max September 3,80');
+    await page.click(`.zeile >> nth=${okt}`);
+    await page.waitForTimeout(200);
+    const buchung = await page.$$eval('.buchung tr', (trs) => trs.map((t) => [...t.children].slice(0, 2).map((c) => c.textContent).join('=')));
+    console.log('BUCHUNG: ' + buchung.join(' | '));
+    pruefe(buchung.join('|') === 'Stichtag=31.10.2026|Buchungswert=1,40|Bemerkung=Indirekte Zeit Oktober 2026', 'Werte für die manuelle Buchung');
+    pruefe((await page.textContent('#ma-detail')).includes('nur einmal gezählt'), 'doppelte Nachweise werden genannt');
+    pruefe(await page.isHidden('#vorschau'), 'Vorschau in der Mitarbeiter-Ansicht ausgeblendet');
+    pruefe((await page.textContent('#status')).includes('Mitarbeiter'), 'Status zeigt Mitarbeiter-Summe');
+    await page.click('.buchung tr:nth-child(2) .link');
+    await page.waitForTimeout(100);
+    const kopiert = await page.textContent('.buchung tr:nth-child(2) .link');
+    pruefe(kopiert === 'Kopiert' || kopiert === 'Nicht möglich', `Kopieren-Knopf reagiert (${kopiert})`);
+    await page.screenshot({ path: path.join(OUT, `${schema}-6b-mitarbeiter.png`) });
+    await page.click('#ans-nachweise');
+    await page.waitForTimeout(800);
+    pruefe((await zeilen(page)).length === 10, 'zurück zur Nachweis-Ansicht');
+
     // Standort wechseln
     await page.click('#st-pinneberg');
     await page.waitForTimeout(1500);

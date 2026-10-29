@@ -1,7 +1,7 @@
 // Oberflaeche von „Indirekte Zeit“ – gemeinsam fuer die Desktop-App und die Testversion im Browser.
 // Plattformabhaengiges (Dateien oeffnen/speichern, Updates) kommt ueber das Objekt `p`.
 import { unzipSync } from 'fflate';
-import { verarbeite, STANDORTE, standortById } from '../engine/nachweis.js';
+import { verarbeite, STANDORTE, standortById, DE } from '../engine/nachweis.js';
 
 export const SUFFIX = '_ergaenzt';
 
@@ -18,6 +18,75 @@ const speicher = {
   set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* egal */ } },
 };
 const anzahl = (n, eins, mehr) => `${n} ${n === 1 ? eins : mehr}`;
+const pad = (n) => String(n).padStart(2, '0');
+const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+/** letztes Datum im Zeitraum („01.10.2026 - 31.10.2026“ -> 31.10.2026) */
+function endeDatum(zeitraum) {
+  const alle = [...String(zeitraum || '').matchAll(/(\d{1,2})\.(\d{1,2})\.(\d{4})/g)];
+  if (!alle.length) return null;
+  const [, t, m, j] = alle[alle.length - 1];
+  const tag = +t, monat = +m, jahr = +j;
+  if (monat < 1 || monat > 12) return null;
+  return { tag, monat, jahr, wert: jahr * 10000 + monat * 100 + tag, text: `${pad(tag)}.${pad(monat)}.${jahr}` };
+}
+
+/**
+ * Indirekte Stunden je Mitarbeiter (betreuende Fachkraft laut Nachweis) und Monat –
+ * fuer die manuelle Buchung im Stundenkonto in Kilanka.
+ */
+export function mitarbeiterGruppen(dateien) {
+  const gruppen = new Map();
+  const gesehen = new Map(); // gleicher Nachweis in mehreren Dateien (z. B. Original und _ergaenzt) nur einmal zaehlen
+  for (const d of dateien) {
+    for (const n of d.ergebnis.nachweise) {
+      if (n.indirekt === null || n.indirekt === undefined) continue;
+      const ende = endeDatum(n.zeitraum);
+      const fachkraft = (n.fachkraft || '').replace(/\s+/g, ' ').trim() || 'Ohne Angabe im Nachweis';
+      const monat = ende ? `${ende.jahr}-${pad(ende.monat)}` : '?';
+      const key = `${fachkraft}|${monat}`;
+      let g = gruppen.get(key);
+      if (!g) {
+        g = {
+          key, fachkraft, monatText: ende ? `${MONATE[ende.monat - 1]} ${ende.jahr}` : 'Zeitraum unbekannt',
+          stichtag: null, stichtagWert: 0, direkt: 0, indirekt: 0, gesamt: 0, nachweise: [], doppelt: [],
+        };
+        gruppen.set(key, g);
+      }
+      const kennung = [fachkraft, n.name, n.zeitraum, n.direkt, n.anzahlTage].join('|');
+      if (gesehen.has(kennung)) {
+        g.doppelt.push({ d, n, wie: gesehen.get(kennung) });
+        continue;
+      }
+      gesehen.set(kennung, d.name);
+      g.direkt += n.direkt || 0;
+      g.indirekt += n.indirekt;
+      g.gesamt += n.gesamt || 0;
+      g.nachweise.push({ d, n });
+      if (ende && ende.wert > g.stichtagWert) { g.stichtagWert = ende.wert; g.stichtag = ende.text; }
+    }
+  }
+  return [...gruppen.values()].sort((a, b) => a.fachkraft.localeCompare(b.fachkraft, 'de') || a.key.localeCompare(b.key));
+}
+
+async function kopieren(text, knopf) {
+  let ok = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); ok = true; }
+  } catch (_) { /* Rueckfall unten */ }
+  if (!ok) {
+    const t = document.createElement('textarea');
+    t.value = text;
+    t.style.position = 'fixed';
+    t.style.opacity = '0';
+    document.body.append(t);
+    t.select();
+    try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+    t.remove();
+  }
+  knopf.textContent = ok ? 'Kopiert' : 'Nicht möglich';
+  setTimeout(() => { knopf.textContent = 'Kopieren'; }, 1500);
+}
 
 /** Dateiname ohne Endung + Suffix */
 export function zielName(name) {
@@ -62,6 +131,8 @@ export function starte(p) {
     standort: standortById(speicher.get('standort') || 'segeberg').id,
     dateien: [],
     auswahl: null, // { id, nachweis }
+    ansicht: 'nachweise', // oder 'mitarbeiter'
+    maAuswahl: null, // Schluessel der gewaehlten Mitarbeiter-Gruppe
     beschaeftigt: false,
     zuletzt: null, // zuletzt gespeicherte Datei (fuer „Im Ordner zeigen“)
   };
@@ -78,6 +149,10 @@ export function starte(p) {
     $('btn-zeigen').hidden = true;
     const alle = state.dateien.flatMap((d) => (d.ergebnis.nachweise.length ? d.ergebnis.nachweise : [null]));
     if (!alle.length) return status('');
+    if (state.ansicht === 'mitarbeiter') {
+      const g = mitarbeiterGruppen(state.dateien);
+      return status(g.length ? `${anzahl(new Set(g.map((x) => x.fachkraft)).size, 'Mitarbeiter', 'Mitarbeiter')} · zusammen ${DE.format(g.reduce((s, x) => s + x.indirekt, 0))} Std. indirekt` : '');
+    }
     const fehler = alle.filter((n) => !n || n.status === 'fehler').length;
     const teile = [anzahl(alle.length, 'Nachweis', 'Nachweise')];
     if (fehler) teile.push(`${fehler} nicht eingetragen`);
@@ -222,10 +297,90 @@ export function starte(p) {
         liste.append(z);
       });
     }
+    renderSpeichern();
+  }
+
+  function renderSpeichern() {
     const offen = offeneDateien().length;
     const btn = $('btn-speichern');
     btn.disabled = !offen || state.beschaeftigt;
     btn.textContent = offen > 1 ? `${offen} Dateien speichern` : 'Speichern';
+  }
+
+  // ---------------------------------------------------------------- Ansicht „Mitarbeiter“
+  function renderAnsicht() {
+    const ma = state.ansicht === 'mitarbeiter';
+    $('ans-nachweise').setAttribute('aria-checked', String(!ma));
+    $('ans-mitarbeiter').setAttribute('aria-checked', String(ma));
+    $('kopf-name').textContent = ma ? 'Mitarbeiter' : 'Nachweis';
+    $('detail-kopf').hidden = ma;
+    $('vorschau').hidden = ma;
+    $('ma-detail').hidden = !ma;
+  }
+
+  function renderMitarbeiter() {
+    const gruppen = mitarbeiterGruppen(state.dateien);
+    if (!gruppen.some((g) => g.key === state.maAuswahl)) state.maAuswahl = gruppen.length ? gruppen[0].key : null;
+    const liste = $('liste');
+    liste.replaceChildren();
+    if (!gruppen.length) liste.append(el('div', 'liste-hinweis', 'Für keinen Nachweis konnten indirekte Stunden berechnet werden.'));
+    for (const g of gruppen) {
+      const z = el('button', 'zeile');
+      z.type = 'button';
+      z.setAttribute('role', 'option');
+      z.setAttribute('aria-selected', String(g.key === state.maAuswahl));
+      const links = el('div', 'links');
+      links.append(el('div', 'name', g.fachkraft));
+      links.append(el('div', 'info', `${g.monatText} · ${anzahl(g.nachweise.length, 'Nachweis', 'Nachweise')}`));
+      z.append(links, el('div', 'zahl', DE.format(g.direkt)), el('div', 'zahl gesamt', DE.format(g.indirekt)), el('div', 'zahl', DE.format(g.gesamt)));
+      z.addEventListener('click', () => {
+        state.maAuswahl = g.key;
+        renderMitarbeiter();
+      });
+      liste.append(z);
+    }
+    renderSpeichern();
+
+    const box = $('ma-detail');
+    box.replaceChildren();
+    const g = gruppen.find((x) => x.key === state.maAuswahl);
+    if (!g) return;
+    box.append(el('p', 'titel', g.fachkraft), el('p', 'leise', `${g.monatText} · ${anzahl(g.nachweise.length, 'Nachweis', 'Nachweise')}`));
+    box.append(el('p', 'abschnitt', 'In Kilanka als manuelle Buchung im Stundenkonto eintragen:'));
+    box.append(el('p', 'leise', 'Mitarbeiter → Konten → Stundenkonto → Plus oben rechts'));
+    const tabelle = el('table', 'buchung');
+    const zeile = (label, wert) => {
+      const tr = el('tr');
+      const k = el('button', 'link', 'Kopieren');
+      k.type = 'button';
+      k.addEventListener('click', () => kopieren(wert, k));
+      const td = el('td');
+      td.append(k);
+      tr.append(el('th', null, label), el('td', 'wert', wert), td);
+      tabelle.append(tr);
+    };
+    zeile('Stichtag', g.stichtag || '');
+    zeile('Buchungswert', DE.format(g.indirekt));
+    zeile('Bemerkung', `Indirekte Zeit ${g.monatText}`);
+    box.append(tabelle);
+    box.append(el('p', 'abschnitt', 'Zusammensetzung'));
+    const ul = el('ul', 'ma-liste');
+    for (const { d, n } of g.nachweise) {
+      const li = el('li');
+      li.append(el('div', null, `${n.name || d.name} · ${n.indirektText} Std.`));
+      const info = [n.zeitraum, n.formel, d.name].filter(Boolean).join(' · ');
+      li.append(el('div', 'leise', info));
+      if (n.status === 'fehler') li.append(el('div', 'leise', 'In der PDF nicht eingetragen, für das Stundenkonto trotzdem mitgezählt.'));
+      ul.append(li);
+    }
+    for (const { d, n, wie } of g.doppelt) {
+      const li = el('li');
+      li.append(el('div', 'leise', `${n.name || d.name} · ${d.name}: derselbe Nachweis wie in ${wie} – nur einmal gezählt.`));
+      ul.append(li);
+    }
+    box.append(ul);
+    if (g.fachkraft.startsWith('Ohne Angabe')) box.append(el('p', 'leise', 'In diesen Nachweisen steht keine betreuende Fachkraft.'));
+    box.append(el('p', 'leise hinweis-unten', 'Grundlage ist die betreuende Fachkraft im Nachweis. Hat eine Vertretung Tage übernommen, steht das nicht in der PDF.'));
   }
 
   function renderDetail() {
@@ -259,8 +414,12 @@ export function starte(p) {
     renderStandort();
     if (!leer) {
       if (!aktuell().d) state.auswahl = { id: state.dateien[0].id, nachweis: 0 };
-      renderListe();
-      renderDetail();
+      renderAnsicht();
+      if (state.ansicht === 'mitarbeiter') renderMitarbeiter();
+      else {
+        renderListe();
+        renderDetail();
+      }
     } else {
       $('btn-speichern').disabled = true;
       $('btn-speichern').textContent = 'Speichern';
@@ -372,6 +531,13 @@ export function starte(p) {
   });
   const oeffnen = () => hinzufuegen(() => p.oeffnen());
   $('btn-oeffnen').addEventListener('click', oeffnen);
+  const ansichtSetzen = (a) => {
+    if (state.ansicht === a) return;
+    state.ansicht = a;
+    renderAlles();
+  };
+  $('ans-nachweise').addEventListener('click', () => ansichtSetzen('nachweise'));
+  $('ans-mitarbeiter').addEventListener('click', () => ansichtSetzen('mitarbeiter'));
   $('btn-speichern').addEventListener('click', speichern);
   $('btn-leeren').addEventListener('click', () => {
     state.dateien = [];
