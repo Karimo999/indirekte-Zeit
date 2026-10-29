@@ -56,7 +56,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc0RDY1MzU1NzY1OEE0NzcKUldSM3BGaDJWVlBXZEd1ekVXQlRlc08xaGkxSlYyMzMrdisrWDRPZUFGOUQzcFNDb0lzSGJrNVQK",
-      "endpoints": ["https://github.com/OWNER/REPO/releases/latest/download/latest.json"],
+      "endpoints": ["https://github.com/Karimo999/indirekte-Zeit/releases/latest/download/latest.json"],
       "windows": { "installMode": "passive" }
     }
   }
