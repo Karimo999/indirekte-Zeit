@@ -1,0 +1,23 @@
+{
+ "zeitnachweis_muster_mia_2026-09.xlsx": {
+  "mitarbeiter": "Muster, Mia",
+  "zeitraum": "01.09.2026 - 30.09.2026",
+  "klienten": 2,
+  "segeberg": "1,60",
+  "pinneberg": "7,43"
+ },
+ "zeitnachweis_beispiel_ben_teilmonat.xlsx": {
+  "mitarbeiter": "Beispiel, Ben",
+  "zeitraum": "15.09.2026 - 30.09.2026",
+  "klienten": 1,
+  "segeberg": "1,20",
+  "pinneberg": "6,86"
+ },
+ "zeitnachweis_schulbegleiter_max_2026-09.xlsx": {
+  "mitarbeiter": "Schulbegleiter, Max",
+  "zeitraum": "01.09.2026 - 30.09.2026",
+  "klienten": 1,
+  "segeberg": "0,60",
+  "pinneberg": "3,00"
+ }
+}

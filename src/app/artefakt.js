@@ -10,7 +10,7 @@ async function ausFiles(files) {
   const fehler = [];
   for (const f of files) {
     const name = f.name || 'Datei.pdf';
-    if (!/\.(pdf|zip)$/i.test(name)) { fehler.push(`${name} ist keine PDF- oder ZIP-Datei.`); continue; }
+    if (!/\.(pdf|zip|xlsx)$/i.test(name)) { fehler.push(`${name} ist keine PDF-, Excel- oder ZIP-Datei.`); continue; }
     if (istErgaenzt(name)) continue;
     try {
       dateien.push({ name, bytes: new Uint8Array(await f.arrayBuffer()), quelle: {}, schluessel: `${name}|${f.size}` });
@@ -46,7 +46,7 @@ async function ausDrop(dt) {
     } else resolve();
   });
   for (const e of eintraege) await lese(e);
-  return ausFiles(files.filter((f) => /\.(pdf|zip)$/i.test(f.name)));
+  return ausFiles(files.filter((f) => /\.(pdf|zip|xlsx)$/i.test(f.name)));
 }
 
 let downloadsCap;

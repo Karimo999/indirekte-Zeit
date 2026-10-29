@@ -29,6 +29,12 @@ zwei Nachkommastellen, kaufmännisch gerundet.
    **Mitarbeiter → Konten → Stundenkonto → Plus** (Stichtag, Buchungswert, Bemerkung; die App zeigt alle drei
    zum Kopieren). Derselbe Nachweis in mehreren Dateien wird nur einmal gezählt.
 
+5. **Zeitnachweise (Excel):** Den Zeitnachweis eines Mitarbeiters aus Kilanka (Excel-Export) einfach mit
+   ablegen. Die App zählt alle Einträge mit Klient und rechnet die indirekten Stunden je Klient nach den
+   Regeln des Standorts (Segeberg: 12 Min. pro Tag mit Klient; Pinneberg: 20 % mit Obergrenze). Das Ergebnis
+   steht unter **Mitarbeiter**, mit Stichtag, Buchungswert und Bemerkung zum Kopieren. Ist für denselben
+   Mitarbeiter und Monat auch ein Leistungsnachweis geladen, zählt nur der Zeitnachweis.
+
 Kilanka lässt von außen keine Buchungen zu (API und Applets können nur lesen), deshalb ist dieser Schritt
 manuell: eine Buchung pro Mitarbeiter und Monat.
 

@@ -27,8 +27,8 @@ async function lesen(pfade) {
   }
   for (const pfad of liste) {
     const name = dateiname(pfad);
-    if (!/\.(pdf|zip)$/i.test(name)) {
-      fehler.push(`${name} ist keine PDF- oder ZIP-Datei.`);
+    if (!/\.(pdf|zip|xlsx)$/i.test(name)) {
+      fehler.push(`${name} ist keine PDF-, Excel- oder ZIP-Datei.`);
       continue;
     }
     try {
@@ -38,7 +38,7 @@ async function lesen(pfade) {
       fehler.push(`${name} konnte nicht gelesen werden.`);
     }
   }
-  if (!liste.length && !fehler.length) fehler.push('Keine PDF- oder ZIP-Dateien gefunden.');
+  if (!liste.length && !fehler.length) fehler.push('Keine PDF-, Excel- oder ZIP-Dateien gefunden.');
   return { dateien, fehler };
 }
 
@@ -129,7 +129,7 @@ async function main() {
       const auswahl = await dialog.open({
         multiple: true,
         title: 'Leistungsnachweise öffnen',
-        filters: [{ name: 'PDF oder ZIP', extensions: ['pdf', 'PDF', 'zip', 'ZIP'] }],
+        filters: [{ name: 'Leistungsnachweise, Zeitnachweise, ZIP', extensions: ['pdf', 'PDF', 'xlsx', 'XLSX', 'zip', 'ZIP'] }],
       });
       if (!auswahl) return null;
       return lesen(Array.isArray(auswahl) ? auswahl : [auswahl]);

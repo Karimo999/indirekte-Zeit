@@ -24,10 +24,15 @@ fn kleingeschrieben_name(p: &Path) -> Option<String> {
     p.file_name().and_then(|n| n.to_str()).map(|n| n.to_lowercase())
 }
 
-/// PDF oder ZIP, aber keine bereits ergaenzte Datei und keine versteckten Dateien (z. B. „._“ vom Mac)
+/// PDF, Excel oder ZIP, aber keine bereits ergaenzte Datei, keine versteckten Dateien (z. B. „._“ vom Mac)
+/// und keine Sperrdateien von Excel („~$…“)
 fn ist_kandidat(p: &Path) -> bool {
     match kleingeschrieben_name(p) {
-        Some(n) => !n.starts_with('.') && ((n.ends_with(".pdf") && !n.ends_with("_ergaenzt.pdf")) || n.ends_with(".zip")),
+        Some(n) => {
+            !n.starts_with('.')
+                && !n.starts_with("~$")
+                && ((n.ends_with(".pdf") && !n.ends_with("_ergaenzt.pdf")) || n.ends_with(".zip") || n.ends_with(".xlsx"))
+        }
         None => false,
     }
 }
@@ -230,5 +235,7 @@ mod tests {
         assert!(!ist_kandidat(Path::new("/a/b_ergaenzt.pdf")));
         assert!(!ist_kandidat(Path::new("/a/._b.pdf")));
         assert!(!ist_kandidat(Path::new("/a/b.docx")));
+        assert!(ist_kandidat(Path::new("/a/Zeitnachweis_Mai.xlsx")));
+        assert!(!ist_kandidat(Path::new("/a/~$Zeitnachweis_Mai.xlsx")));
     }
 }

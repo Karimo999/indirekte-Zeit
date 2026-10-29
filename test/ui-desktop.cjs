@@ -36,6 +36,10 @@ const DATEIEN = {
   'C:\\Users\\Moritz\\Downloads\\Massnahmen.zip': zip,
   'C:\\Schreibgeschuetzt\\Nur_lesen.pdf': b64('19_einfuegen_volle_breite.pdf'),
   'C:\\Users\\Moritz\\Desktop\\Notiz.docx': Buffer.from('kein pdf').toString('base64'),
+  'C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Muster_Mia.xlsx': b64('zeitnachweis_muster_mia_2026-09.xlsx'),
+  'C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Max.xlsx': b64('zeitnachweis_schulbegleiter_max_2026-09.xlsx'),
+  'C:\\Users\\Moritz\\Downloads\\Max_September.pdf': b64('01_muster_sept.pdf'),
+  'C:\\Users\\Moritz\\Downloads\\Tabelle.xlsx': Buffer.from('PK kaputt').toString('base64'),
 };
 const ORDNER = { 'C:\\Users\\Moritz\\Downloads\\Kilanka': ['C:\\Users\\Moritz\\Downloads\\Kilanka\\A.pdf', 'C:\\Users\\Moritz\\Downloads\\Kilanka\\B.pdf'] };
 
@@ -260,6 +264,39 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     await page.waitForTimeout(500);
     const st = await page.textContent('#status');
     pruefe(st.includes('Nicht gespeichert') && st.includes('keine Schreibberechtigung') && !(await page.isDisabled('#btn-speichern')), 'Schreibfehler gemeldet, erneut speicherbar');
+
+    // Zeitnachweis (Excel) eines Mitarbeiters: nur der Wert fuers Stundenkonto
+    await page.click('#btn-leeren');
+    await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Muster_Mia.xlsx']);
+    await page.waitForTimeout(800);
+    pruefe((await page.getAttribute('#ans-mitarbeiter', 'aria-checked')) === 'true', 'nur Excel abgelegt -> Ansicht Mitarbeiter');
+    let zx = await zeilen(page);
+    console.log('EXCEL:\n' + zx.join('\n'));
+    pruefe(zx.length === 1 && zx[0].startsWith('Muster, Mia | September 2026 · Zeitnachweis') && zx[0].includes('1,60'), 'Zeitnachweis Segeberg 1,60');
+    let bx = await page.$$eval('.buchung tr', (trs) => trs.map((t) => [...t.children].slice(0, 2).map((c) => c.textContent).join('=')));
+    pruefe(bx.join('|') === 'Stichtag=30.09.2026|Buchungswert=1,60|Bemerkung=Indirekte Zeit September 2026', 'Buchungswerte aus dem Zeitnachweis');
+    const mdx = await page.textContent('#ma-detail');
+    pruefe(mdx.includes('Kind, Anton · 1,00 Std.') && mdx.includes('Kind, Berta · 0,60 Std.') && mdx.includes('3 Einträge ohne Klient'), 'Aufschlüsselung je Klient');
+    await page.screenshot({ path: path.join(OUT, `${schema}-9-zeitnachweis.png`) });
+    await page.click('#st-pinneberg');
+    await page.waitForTimeout(300);
+    zx = await zeilen(page);
+    pruefe(zx[0].includes('7,43'), 'Zeitnachweis Pinneberg 7,43');
+    await page.click('#st-segeberg');
+    await page.click('#ans-nachweise');
+    pruefe((await page.textContent('#liste')).includes('Keine Leistungsnachweise geladen'), 'Nachweis-Ansicht weist auf die Zeitnachweise hin');
+    // Zeitnachweis und Leistungsnachweis desselben Mitarbeiters im selben Monat -> nur der Zeitnachweis zaehlt
+    await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Max_September.pdf', 'C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Max.xlsx', 'C:\\Users\\Moritz\\Downloads\\Tabelle.xlsx']);
+    await page.waitForTimeout(800);
+    pruefe((await page.textContent('#status')).includes('Tabelle.xlsx'), 'kaputte Excel-Datei gemeldet');
+    await page.click('#ans-mitarbeiter');
+    await page.waitForTimeout(300);
+    zx = await zeilen(page);
+    console.log(zx.join('\n'));
+    const maxZeile = zx.findIndex((z) => z.startsWith('Schulbegleiter, Max | September 2026'));
+    pruefe(zx.filter((z) => z.startsWith('Schulbegleiter, Max | September 2026')).length === 1 && zx[maxZeile].includes('Zeitnachweis') && zx[maxZeile].includes('0,60'), 'Zeitnachweis ersetzt die Werte aus dem Leistungsnachweis');
+    await page.click(`.zeile >> nth=${maxZeile}`);
+    pruefe((await page.textContent('#ma-detail')).includes('Gezählt wird nur der Zeitnachweis'), 'Hinweis auf den ersetzten Leistungsnachweis');
 
     // schmales Fenster
     await page.setViewportSize({ width: 820, height: 560 });

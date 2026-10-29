@@ -13,3 +13,5 @@ tools/testgen/variants/
 tools/testgen/ergebnisse/
 tools/testgen/data_*.json
 tools/testgen/__pycache__/
+# echte Zeitnachweise aus Kilanka (Namen von Mitarbeitern und Klienten) niemals einchecken
+*_bis_*.xlsx

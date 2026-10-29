@@ -5,6 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verarbeite } from '../src/engine/nachweis.js';
 import { PDFFile } from '../src/engine/file.js';
+import { leseZeitnachweis, berechneZeitnachweis } from '../src/engine/zeitnachweis.js';
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), 'faelle');
 const erwartet = JSON.parse(readFileSync(join(DIR, 'erwartet.json'), 'utf8'));
@@ -19,6 +20,7 @@ let fehler = 0;
 for (const standort of ['segeberg', 'pinneberg']) {
   for (const datei of readdirSync(DIR).filter((f) => f.endsWith('.pdf')).sort()) {
     const e = erwartet[datei];
+    if (!e) continue;
     const data = new Uint8Array(readFileSync(join(DIR, datei)));
     const r = verarbeite(data, standort);
     const probleme = [];
@@ -53,5 +55,31 @@ for (const standort of ['segeberg', 'pinneberg']) {
     } else ok++;
   }
 }
+// Zeitnachweise (Excel) der Mitarbeiter: indirekte Stunden fuers Stundenkonto
+const zeitnachweise = JSON.parse(readFileSync(join(DIR, 'erwartet_zeitnachweis.json'), 'utf8'));
+for (const [datei, e] of Object.entries(zeitnachweise)) {
+  const zn = leseZeitnachweis(new Uint8Array(readFileSync(join(DIR, datei))));
+  for (const standort of ['segeberg', 'pinneberg']) {
+    const probleme = [];
+    if (zn.fehler) probleme.push(zn.fehler);
+    else {
+      const r = berechneZeitnachweis(zn, standort);
+      if (zn.mitarbeiter !== e.mitarbeiter) probleme.push(`Mitarbeiter ${zn.mitarbeiter}`);
+      if (zn.zeitraum !== e.zeitraum) probleme.push(`Zeitraum ${zn.zeitraum}`);
+      if (r.klienten.length !== e.klienten) probleme.push(`${r.klienten.length} Klienten`);
+      if (r.indirektText !== e[standort]) probleme.push(`indirekt ${r.indirektText} statt ${e[standort]}`);
+    }
+    if (probleme.length) {
+      fehler++;
+      console.log(`FEHLER ${standort.padEnd(9)} ${datei}: ${probleme.join('; ')}`);
+    } else ok++;
+  }
+}
+// keine Excel-Tabelle mit Zeitnachweis -> verstaendliche Meldung
+{
+  const leer = leseZeitnachweis(new Uint8Array([80, 75, 3, 4]));
+  if (!leer.fehler) { fehler++; console.log('FEHLER: kaputte Excel-Datei ohne Meldung'); } else ok++;
+}
+
 console.log(`\n${ok} von ${ok + fehler} Prüfungen bestanden`);
 process.exit(fehler ? 1 : 0);

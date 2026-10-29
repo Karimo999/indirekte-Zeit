@@ -2,6 +2,7 @@
 // Plattformabhaengiges (Dateien oeffnen/speichern, Updates) kommt ueber das Objekt `p`.
 import { unzipSync } from 'fflate';
 import { verarbeite, STANDORTE, standortById, DE } from '../engine/nachweis.js';
+import { leseZeitnachweis, berechneZeitnachweis } from '../engine/zeitnachweis.js';
 
 export const SUFFIX = '_ergaenzt';
 
@@ -66,6 +67,38 @@ export function mitarbeiterGruppen(dateien) {
       if (ende && ende.wert > g.stichtagWert) { g.stichtagWert = ende.wert; g.stichtag = ende.text; }
     }
   }
+  // Zeitnachweise (Excel) je Mitarbeiter: sie enthalten alle Buchungen und ersetzen fuer diesen Monat
+  // die Werte aus den Leistungsnachweisen (sonst wuerde doppelt gebucht)
+  const ausExcel = new Map();
+  for (const d of dateien) {
+    if (d.art !== 'zeitnachweis' || !d.zn) continue;
+    const zn = d.zeitnachweis;
+    const fachkraft = (zn.mitarbeiter || '').replace(/\s+/g, ' ').trim() || 'Ohne Angabe im Zeitnachweis';
+    const ende = { tag: zn.bis.day, monat: zn.bis.month, jahr: zn.bis.year, wert: zn.bis.key, text: String(zn.bis) };
+    const key = `${fachkraft}|${ende.jahr}-${pad(ende.monat)}`;
+    let g = ausExcel.get(key);
+    if (!g) {
+      g = {
+        key, fachkraft, monatText: `${MONATE[ende.monat - 1]} ${ende.jahr}`, quelle: 'zeitnachweis',
+        stichtag: null, stichtagWert: 0, direkt: 0, indirekt: 0, gesamt: 0, zeitnachweise: [], nachweise: [], doppelt: [], ersetzt: 0,
+      };
+      ausExcel.set(key, g);
+    }
+    if (g.zeitnachweise.some((x) => x.d.bytes.length === d.bytes.length && x.zn.zeitraum === zn.zeitraum && x.d.zn.indirekt === d.zn.indirekt)) {
+      g.doppelt.push({ d, n: { name: d.name }, wie: g.zeitnachweise[0].d.name });
+      continue;
+    }
+    g.zeitnachweise.push({ d, zn });
+    g.direkt += d.zn.direkt;
+    g.indirekt += d.zn.indirekt;
+    g.gesamt += d.zn.gesamt;
+    if (ende.wert > g.stichtagWert) { g.stichtagWert = ende.wert; g.stichtag = ende.text; }
+  }
+  for (const [key, g] of ausExcel) {
+    const pdf = gruppen.get(key);
+    if (pdf) g.ersetzt = pdf.nachweise.length;
+    gruppen.set(key, g);
+  }
   return [...gruppen.values()].sort((a, b) => a.fachkraft.localeCompare(b.fachkraft, 'de') || a.key.localeCompare(b.key));
 }
 
@@ -98,6 +131,9 @@ export const istErgaenzt = (name) => /_ergaenzt\.pdf$/i.test(name);
  * Wandelt gelesene Dateien in Eingaenge um. ZIP-Dateien werden entpackt.
  * @param {{name:string, bytes:Uint8Array, quelle:object, schluessel:string}[]} dateien
  */
+const istExcel = (name) => /\.xlsx$/i.test(name) && !name.split('/').pop().startsWith('~$');
+const istZeitnachweis = (d) => d.art === 'zeitnachweis';
+
 export function entpacken(dateien) {
   const eingaenge = [];
   const fehler = [];
@@ -105,22 +141,27 @@ export function entpacken(dateien) {
     if (/\.zip$/i.test(d.name)) {
       let inhalt;
       try {
-        inhalt = unzipSync(d.bytes, { filter: (x) => /\.pdf$/i.test(x.name) && !x.name.startsWith('__MACOSX') });
+        inhalt = unzipSync(d.bytes, { filter: (x) => (/\.pdf$/i.test(x.name) || istExcel(x.name)) && !x.name.startsWith('__MACOSX') });
       } catch (_) {
         fehler.push(`${d.name} konnte nicht entpackt werden.`);
         continue;
       }
       const namen = Object.keys(inhalt).sort((a, b) => a.localeCompare(b, 'de'));
-      if (!namen.length) fehler.push(`In ${d.name} ist keine PDF-Datei.`);
+      if (!namen.length) fehler.push(`In ${d.name} ist keine PDF- oder Excel-Datei.`);
       for (const n of namen) {
         const name = n.split('/').pop();
         if (istErgaenzt(name)) continue;
-        eingaenge.push({ name, bytes: inhalt[n], quelle: { ...d.quelle, zip: d.name, eintrag: n }, schluessel: d.schluessel + '#' + n });
+        eingaenge.push({
+          name, bytes: inhalt[n], quelle: { ...d.quelle, zip: d.name, eintrag: n }, schluessel: d.schluessel + '#' + n,
+          art: istExcel(name) ? 'zeitnachweis' : 'nachweis',
+        });
       }
     } else if (/\.pdf$/i.test(d.name)) {
-      eingaenge.push(d);
+      eingaenge.push({ ...d, art: 'nachweis' });
+    } else if (istExcel(d.name)) {
+      eingaenge.push({ ...d, art: 'zeitnachweis' });
     } else {
-      fehler.push(`${d.name} ist keine PDF- oder ZIP-Datei.`);
+      fehler.push(`${d.name} ist keine PDF-, Excel- oder ZIP-Datei.`);
     }
   }
   return { eingaenge, fehler };
@@ -147,15 +188,19 @@ export function starte(p) {
   }
   function standardStatus() {
     $('btn-zeigen').hidden = true;
-    const alle = state.dateien.flatMap((d) => (d.ergebnis.nachweise.length ? d.ergebnis.nachweise : [null]));
-    if (!alle.length) return status('');
+    const pdfs = state.dateien.filter((d) => !istZeitnachweis(d));
+    const alle = pdfs.flatMap((d) => (d.ergebnis.nachweise.length ? d.ergebnis.nachweise : [null]));
+    const excel = state.dateien.length - pdfs.length;
+    if (!state.dateien.length) return status('');
     if (state.ansicht === 'mitarbeiter') {
       const g = mitarbeiterGruppen(state.dateien);
       return status(g.length ? `${anzahl(new Set(g.map((x) => x.fachkraft)).size, 'Mitarbeiter', 'Mitarbeiter')} · zusammen ${DE.format(g.reduce((s, x) => s + x.indirekt, 0))} Std. indirekt` : '');
     }
     const fehler = alle.filter((n) => !n || n.status === 'fehler').length;
-    const teile = [anzahl(alle.length, 'Nachweis', 'Nachweise')];
+    const teile = [];
+    if (alle.length) teile.push(anzahl(alle.length, 'Nachweis', 'Nachweise'));
     if (fehler) teile.push(`${fehler} nicht eingetragen`);
+    if (excel) teile.push(`${anzahl(excel, 'Zeitnachweis', 'Zeitnachweise')} unter „Mitarbeiter“`);
     status(teile.join(' · '));
   }
 
@@ -176,24 +221,42 @@ export function starte(p) {
     const { eingaenge, fehler } = entpacken(gelesen.dateien || []);
     fehler.push(...(gelesen.fehler || []));
     let erste = null;
+    let neueZeitnachweise = 0;
+    let neueNachweise = 0;
     for (let i = 0; i < eingaenge.length; i++) {
       const e = eingaenge[i];
       if (eingaenge.length > 3) status(`Wird gelesen … ${i + 1} von ${eingaenge.length}`);
-      let ergebnis;
-      try {
-        ergebnis = verarbeite(e.bytes, state.standort);
-      } catch (_) {
-        ergebnis = { nachweise: [], ausgabe: null, fehler: 'Unerwarteter Fehler beim Lesen dieser Datei.', eintragungen: [] };
+      const leeresErgebnis = { nachweise: [], ausgabe: null, fehler: null, eintragungen: [] };
+      let datei;
+      if (e.art === 'zeitnachweis') {
+        let zn;
+        try { zn = leseZeitnachweis(e.bytes); } catch (_) { zn = { fehler: 'Die Excel-Datei konnte nicht gelesen werden.' }; }
+        if (zn.fehler) { fehler.push(`${e.name}: ${zn.fehler}`); continue; }
+        datei = {
+          id: naechsteId++, art: 'zeitnachweis', name: e.name, bytes: e.bytes, quelle: e.quelle, schluessel: e.schluessel,
+          zeitnachweis: zn, zn: berechneZeitnachweis(zn, state.standort), ergebnis: leeresErgebnis, gespeichert: null,
+        };
+        neueZeitnachweise++;
+      } else {
+        let ergebnis;
+        try {
+          ergebnis = verarbeite(e.bytes, state.standort);
+        } catch (_) {
+          ergebnis = { ...leeresErgebnis, fehler: 'Unerwarteter Fehler beim Lesen dieser Datei.' };
+        }
+        datei = { id: naechsteId++, art: 'nachweis', name: e.name, bytes: e.bytes, quelle: e.quelle, schluessel: e.schluessel, ergebnis, gespeichert: null };
+        neueNachweise++;
+        if (!erste) erste = datei;
       }
-      const datei = { id: naechsteId++, name: e.name, bytes: e.bytes, quelle: e.quelle, schluessel: e.schluessel, ergebnis, gespeichert: null };
       const vorhanden = state.dateien.findIndex((d) => d.schluessel === e.schluessel);
       if (vorhanden >= 0) state.dateien[vorhanden] = datei;
       else state.dateien.push(datei);
-      if (!erste) erste = datei;
       if (i % 4 === 3) await pause();
     }
     state.beschaeftigt = false;
     if (erste) state.auswahl = { id: erste.id, nachweis: 0 };
+    // nur Zeitnachweise abgelegt: gleich die Werte je Mitarbeiter zeigen
+    if (neueZeitnachweise && !neueNachweise) state.ansicht = 'mitarbeiter';
     renderAlles();
     if (fehler.length) status(fehler.join(' '), true);
     else if (!eingaenge.length) status('Keine PDF-Dateien gefunden.', true);
@@ -204,7 +267,8 @@ export function starte(p) {
     state.standort = id;
     speicher.set('standort', id);
     for (const d of state.dateien) {
-      d.ergebnis = verarbeite(d.bytes, id);
+      if (istZeitnachweis(d)) d.zn = berechneZeitnachweis(d.zeitnachweis, id);
+      else d.ergebnis = verarbeite(d.bytes, id);
       d.gespeichert = null;
     }
     dokumente.clear();
@@ -251,7 +315,7 @@ export function starte(p) {
 
   function aktuell() {
     if (!state.auswahl) return {};
-    const d = state.dateien.find((x) => x.id === state.auswahl.id);
+    const d = state.dateien.find((x) => x.id === state.auswahl.id && !istZeitnachweis(x));
     if (!d) return {};
     return { d, n: d.ergebnis.nachweise[state.auswahl.nachweis] || null };
   }
@@ -267,7 +331,9 @@ export function starte(p) {
   function renderListe() {
     const liste = $('liste');
     liste.replaceChildren();
-    for (const d of state.dateien) {
+    const pdfs = state.dateien.filter((d) => !istZeitnachweis(d));
+    if (!pdfs.length) liste.append(el('div', 'liste-hinweis', 'Keine Leistungsnachweise geladen. Die Zeitnachweise stehen unter „Mitarbeiter“.'));
+    for (const d of pdfs) {
       const nachweise = d.ergebnis.nachweise.length ? d.ergebnis.nachweise : [null];
       nachweise.forEach((n, i) => {
         const z = el('button', 'zeile');
@@ -332,7 +398,8 @@ export function starte(p) {
       z.setAttribute('aria-selected', String(g.key === state.maAuswahl));
       const links = el('div', 'links');
       links.append(el('div', 'name', g.fachkraft));
-      links.append(el('div', 'info', `${g.monatText} · ${anzahl(g.nachweise.length, 'Nachweis', 'Nachweise')}`));
+      const herkunft = g.quelle === 'zeitnachweis' ? (g.zeitnachweise.length > 1 ? `${g.zeitnachweise.length} Zeitnachweise` : 'Zeitnachweis') : anzahl(g.nachweise.length, 'Nachweis', 'Nachweise');
+      links.append(el('div', 'info', `${g.monatText} · ${herkunft}`));
       z.append(links, el('div', 'zahl', DE.format(g.direkt)), el('div', 'zahl gesamt', DE.format(g.indirekt)), el('div', 'zahl', DE.format(g.gesamt)));
       z.addEventListener('click', () => {
         state.maAuswahl = g.key;
@@ -346,7 +413,10 @@ export function starte(p) {
     box.replaceChildren();
     const g = gruppen.find((x) => x.key === state.maAuswahl);
     if (!g) return;
-    box.append(el('p', 'titel', g.fachkraft), el('p', 'leise', `${g.monatText} · ${anzahl(g.nachweise.length, 'Nachweis', 'Nachweise')}`));
+    const herkunft = g.quelle === 'zeitnachweis'
+      ? `Zeitnachweis ${g.zeitnachweise.map((x) => x.zn.zeitraum).join(', ')}`
+      : anzahl(g.nachweise.length, 'Nachweis', 'Nachweise');
+    box.append(el('p', 'titel', g.fachkraft), el('p', 'leise', `${g.monatText} · ${herkunft}`));
     box.append(el('p', 'abschnitt', 'In Kilanka als manuelle Buchung im Stundenkonto eintragen:'));
     box.append(el('p', 'leise', 'Mitarbeiter → Konten → Stundenkonto → Plus oben rechts'));
     const tabelle = el('table', 'buchung');
@@ -366,6 +436,19 @@ export function starte(p) {
     box.append(tabelle);
     box.append(el('p', 'abschnitt', 'Zusammensetzung'));
     const ul = el('ul', 'ma-liste');
+    for (const { d, zn } of g.zeitnachweise || []) {
+      for (const k of d.zn.klienten) {
+        const li = el('li');
+        li.append(el('div', null, `${k.name} · ${DE.format(k.indirekt)} Std.`));
+        const tage = `${anzahl(k.eintraege, 'Eintrag', 'Einträge')} mit Klient, ${DE.format(k.direkt)} Std.`;
+        li.append(el('div', 'leise', `${tage} · ${k.formel}`));
+        ul.append(li);
+      }
+      if (!d.zn.klienten.length) ul.append(el('li', 'leise', 'Keine Einträge mit Klient.'));
+      const li = el('li', 'leise');
+      li.textContent = `${d.name} · ${zn.zeitraum}${d.zn.ohneKlient ? ` · ${anzahl(d.zn.ohneKlient, 'Eintrag', 'Einträge')} ohne Klient (z. B. Krank, Termine) nicht gezählt` : ''}`;
+      ul.append(li);
+    }
     for (const { d, n } of g.nachweise) {
       const li = el('li');
       li.append(el('div', null, `${n.name || d.name} · ${n.indirektText} Std.`));
@@ -376,12 +459,20 @@ export function starte(p) {
     }
     for (const { d, n, wie } of g.doppelt) {
       const li = el('li');
-      li.append(el('div', 'leise', `${n.name || d.name} · ${d.name}: derselbe Nachweis wie in ${wie} – nur einmal gezählt.`));
+      const text = d.art === 'zeitnachweis'
+        ? `${d.name}: derselbe Zeitnachweis wie ${wie} – nur einmal gezählt.`
+        : `${n.name || d.name} · ${d.name}: derselbe Nachweis wie in ${wie} – nur einmal gezählt.`;
+      li.append(el('div', 'leise', text));
       ul.append(li);
     }
     box.append(ul);
-    if (g.fachkraft.startsWith('Ohne Angabe')) box.append(el('p', 'leise', 'In diesen Nachweisen steht keine betreuende Fachkraft.'));
-    box.append(el('p', 'leise hinweis-unten', 'Grundlage ist die betreuende Fachkraft im Nachweis. Hat eine Vertretung Tage übernommen, steht das nicht in der PDF.'));
+    if (g.quelle === 'zeitnachweis') {
+      if (g.ersetzt) box.append(el('p', 'leise hinweis-unten', `Für diesen Monat ${g.ersetzt === 1 ? 'ist auch ein Leistungsnachweis' : `sind auch ${g.ersetzt} Leistungsnachweise`} dieses Mitarbeiters geladen. Gezählt wird nur der Zeitnachweis, damit nichts doppelt gebucht wird.`));
+      box.append(el('p', 'leise hinweis-unten', 'Gezählt werden alle Einträge mit Klient, die Regeln wie beim Leistungsnachweis je Klient.'));
+    } else {
+      if (g.fachkraft.startsWith('Ohne Angabe')) box.append(el('p', 'leise', 'In diesen Nachweisen steht keine betreuende Fachkraft.'));
+      box.append(el('p', 'leise hinweis-unten', 'Grundlage ist die betreuende Fachkraft im Nachweis. Hat eine Vertretung Tage übernommen, steht das nicht in der PDF.'));
+    }
   }
 
   function renderDetail() {
@@ -414,7 +505,10 @@ export function starte(p) {
     $('btn-leeren').hidden = leer;
     renderStandort();
     if (!leer) {
-      if (!aktuell().d) state.auswahl = { id: state.dateien[0].id, nachweis: 0 };
+      if (!aktuell().d) {
+        const erstePdf = state.dateien.find((d) => !istZeitnachweis(d));
+        state.auswahl = erstePdf ? { id: erstePdf.id, nachweis: 0 } : null;
+      }
       renderAnsicht();
       if (state.ansicht === 'mitarbeiter') renderMitarbeiter();
       else {
