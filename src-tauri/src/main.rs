@@ -105,22 +105,62 @@ fn schreiben(original: String, relativ: String, ordner: Option<String>, daten: V
         None => original.parent().map(Path::to_path_buf).ok_or("Ordner des Originals unbekannt")?,
     };
     let ziel = zielpfad(&basis, &relativ)?;
-    if ziel == original {
-        return Err("das Original darf nicht überschrieben werden".into());
+    if gleiche_datei(&original, &ziel) {
+        return Err("das Original kann nicht überschrieben werden".into());
     }
+    atomar_schreiben(&ziel, &daten)?;
+    Ok(ziel.to_string_lossy().into_owned())
+}
+
+/// Schreibt die ergaenzte PDF an den im Speichern-Dialog gewaehlten Ort. Das Original wird nie ueberschrieben.
+#[tauri::command]
+fn schreiben_als(ziel: String, original: Option<String>, daten: Vec<u8>) -> Result<String, String> {
+    if !daten.starts_with(b"%PDF") {
+        return Err("keine PDF-Daten".into());
+    }
+    let mut ziel = PathBuf::from(ziel);
+    if !matches!(kleingeschrieben_name(&ziel), Some(n) if n.ends_with(".pdf")) {
+        let mut s = ziel.into_os_string();
+        s.push(".pdf");
+        ziel = PathBuf::from(s);
+    }
+    if let Some(o) = original {
+        if gleiche_datei(Path::new(&o), &ziel) {
+            return Err("das Original kann nicht überschrieben werden – bitte einen anderen Namen wählen".into());
+        }
+    }
+    atomar_schreiben(&ziel, &daten)?;
+    Ok(ziel.to_string_lossy().into_owned())
+}
+
+/// Welche dieser Dateinamen gibt es im Ordner schon?
+#[tauri::command]
+fn vorhandene_dateien(ordner: String, namen: Vec<String>) -> Vec<String> {
+    let basis = PathBuf::from(ordner);
+    namen.into_iter().filter(|n| basis.join(n).exists()).collect()
+}
+
+fn gleiche_datei(a: &Path, b: &Path) -> bool {
+    match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => a == b,
+    }
+}
+
+/// zuerst in eine Zwischendatei schreiben, dann umbenennen: nie eine halbe Datei am Ziel
+fn atomar_schreiben(ziel: &Path, daten: &[u8]) -> Result<(), String> {
     if let Some(p) = ziel.parent() {
         fs::create_dir_all(p).map_err(|e| fehlertext(&e))?;
     }
-    // zuerst in eine Zwischendatei schreiben, dann umbenennen: nie eine halbe Datei am Ziel
-    let mut tmp = ziel.clone().into_os_string();
+    let mut tmp = ziel.to_path_buf().into_os_string();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
-    fs::write(&tmp, &daten).map_err(|e| fehlertext(&e))?;
-    if let Err(e) = fs::rename(&tmp, &ziel) {
+    fs::write(&tmp, daten).map_err(|e| fehlertext(&e))?;
+    if let Err(e) = fs::rename(&tmp, ziel) {
         let _ = fs::remove_file(&tmp);
         return Err(fehlertext(&e));
     }
-    Ok(ziel.to_string_lossy().into_owned())
+    Ok(())
 }
 
 /// Zeigt die Datei im Finder bzw. Explorer
@@ -134,7 +174,14 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![dateien_sammeln, datei_lesen, schreiben, im_ordner_zeigen])
+        .invoke_handler(tauri::generate_handler![
+            dateien_sammeln,
+            datei_lesen,
+            schreiben,
+            schreiben_als,
+            vorhandene_dateien,
+            im_ordner_zeigen
+        ])
         .run(tauri::generate_context!())
         .expect("Indirekte Zeit konnte nicht gestartet werden");
 }
@@ -152,6 +199,28 @@ mod tests {
         assert!(zielpfad(b, "/etc/a.pdf").is_err());
         assert!(zielpfad(b, "a.exe").is_err());
         assert!(zielpfad(b, "").is_err());
+    }
+
+    #[test]
+    fn schreiben_als_schuetzt_original_und_ergaenzt_endung() {
+        let dir = std::env::temp_dir().join(format!("iz-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("Nachweis.pdf");
+        fs::write(&original, b"%PDF-original").unwrap();
+        let o = Some(original.to_string_lossy().into_owned());
+        // Original als Ziel wird abgelehnt und bleibt unveraendert
+        assert!(schreiben_als(original.to_string_lossy().into_owned(), o.clone(), b"%PDF-neu".to_vec()).is_err());
+        assert_eq!(fs::read(&original).unwrap(), b"%PDF-original");
+        // fehlende Endung wird ergaenzt
+        let ziel = schreiben_als(dir.join("Ergebnis").to_string_lossy().into_owned(), o.clone(), b"%PDF-neu".to_vec()).unwrap();
+        assert!(ziel.ends_with("Ergebnis.pdf"));
+        assert_eq!(fs::read(&ziel).unwrap(), b"%PDF-neu");
+        // keine PDF-Daten
+        assert!(schreiben_als(dir.join("x.pdf").to_string_lossy().into_owned(), o, b"kein pdf".to_vec()).is_err());
+        // vorhandene Dateien
+        let v = vorhandene_dateien(dir.to_string_lossy().into_owned(), vec!["Ergebnis.pdf".into(), "fehlt.pdf".into()]);
+        assert_eq!(v, vec!["Ergebnis.pdf".to_string()]);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

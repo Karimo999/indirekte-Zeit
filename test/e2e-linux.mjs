@@ -53,7 +53,7 @@ try {
   await wd('POST', `${S}/window/rect`, { width: 1280, height: 800 }).catch(() => {});
   await sleep(2500);
 
-  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.2.0', 'Version aus der App');
+  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.3.0', 'Version aus der App');
   await bild('1-start.png');
   // die App merkt sich den Standort – fuer den Test immer mit Segeberg beginnen
   await js('document.getElementById("st-segeberg").click()');
@@ -83,19 +83,24 @@ try {
   pruefe(canvas > 100, 'Vorschau (pdf.js) gezeichnet');
   await bild('3-vorschau.png');
 
-  // Speichern
+  // Speichern: die nativen Dialoge werden fuer den Test ersetzt (Ordner bzw. Dateiname vorgegeben)
+  const ZIEL = '/tmp/indirekte-zeit-e2e/Ablage Ü';
+  mkdirSync(ZIEL, { recursive: true });
+  writeFileSync(join(ZIEL, 'Sammel_ergaenzt.pdf'), '%PDF-alt');
+  await js(`window.__TAURI__.dialog.open = async () => ${JSON.stringify(ZIEL)};
+    window.__fragen = [];
+    window.__TAURI__.dialog.ask = async (t) => { window.__fragen.push(t); return true; };`);
   await js('document.getElementById("btn-speichern").click()');
   await sleep(2500);
   const nachher = await js('return document.getElementById("status").textContent');
   console.log('Status nach Speichern:', nachher);
-  const erwartet = [
-    join(ORDNER, 'Begleitkind_Oktober_ergaenzt.pdf'),
-    join(ORDNER, 'Sammel_ergaenzt.pdf'),
-    join(ORDNER, 'Export_ergaenzt', 'Teilmonat_ergaenzt.pdf'),
-    join(ORDNER, 'Export_ergaenzt', 'Muster_ergaenzt.pdf'),
-  ];
-  for (const p of erwartet) pruefe(existsSync(p), 'gespeichert: ' + p.replace(ORDNER, '…'));
-  pruefe(!existsSync(join(ORDNER, 'Unterordner', 'Langer_ergaenzt.pdf')), 'Fehlerfall nicht gespeichert');
+  const fragen = await js('return window.__fragen');
+  pruefe(fragen.length === 1 && fragen[0].includes('Sammel_ergaenzt.pdf'), 'Rückfrage vor dem Ersetzen einer vorhandenen Datei');
+  const erwartet = ['Begleitkind_Oktober_ergaenzt.pdf', 'Sammel_ergaenzt.pdf', 'Teilmonat_ergaenzt.pdf', 'Muster_ergaenzt.pdf'].map((n) => join(ZIEL, n));
+  for (const p of erwartet) pruefe(existsSync(p), 'gespeichert im gewählten Ordner: ' + p.replace(ZIEL, '…'));
+  pruefe(readFileSync(join(ZIEL, 'Sammel_ergaenzt.pdf')).length > 1000, 'vorhandene Datei ersetzt');
+  pruefe(!existsSync(join(ORDNER, 'Begleitkind_Oktober_ergaenzt.pdf')), 'nichts ungefragt neben dem Original');
+  pruefe(nachher === '4 Dateien gespeichert in Ablage Ü', 'Status nennt den Ordner');
   // gespeicherte Datei ist das Original plus Ergaenzung und wird als bereits ergaenzt erkannt
   const orig = readFileSync(join(F, '07_alt_nur_summe.pdf'));
   const neu = readFileSync(erwartet[0]);
@@ -119,6 +124,25 @@ try {
   pruefe(ma.length >= 3 && ma.some((z) => z.startsWith('Schulbegleiter, Max | Oktober 2026')), 'Mitarbeiter-Ansicht mit Monatswerten');
   pruefe((await js('return document.querySelector(".buchung") ? document.querySelector(".buchung").innerText : ""')).includes('Buchungswert'), 'Buchungswerte angezeigt');
   await bild('6-mitarbeiter.png');
+
+  // eine Datei: „Speichern unter“ – Original darf nicht ueberschrieben werden
+  await js('document.getElementById("ans-nachweise").click(); document.getElementById("btn-leeren").click()');
+  const einzeln = join(ORDNER, 'Begleitkind_Oktober.pdf');
+  await jsAsync(`const fertig = arguments[arguments.length - 1];
+    window.__TAURI__.event.emitTo({ kind: 'Webview', label: 'main' }, 'tauri://drag-drop', { paths: [arguments[0]], position: { x: 1, y: 1 } }).then(() => fertig('ok'));`, [einzeln]);
+  await sleep(1500);
+  await js(`window.__TAURI__.dialog.save = async () => ${JSON.stringify(einzeln)};`);
+  await js('document.getElementById("btn-speichern").click()');
+  await sleep(1200);
+  const st1 = await js('return document.getElementById("status").textContent');
+  pruefe(st1.includes('Original kann nicht überschrieben werden'), 'Original als Ziel abgelehnt: ' + st1);
+  pruefe(readFileSync(einzeln).equals(readFileSync(join(F, '07_alt_nur_summe.pdf'))), 'Original unverändert');
+  const neuerName = join(ZIEL, 'Oktober final');
+  await js(`window.__TAURI__.dialog.save = async () => ${JSON.stringify(neuerName)};`);
+  await js('document.getElementById("btn-speichern").click()');
+  await sleep(1200);
+  const st2 = await js('return document.getElementById("status").textContent');
+  pruefe(existsSync(neuerName + '.pdf') && st2 === 'Gespeichert als Oktober final.pdf', 'Speichern unter mit eigenem Namen (Endung ergänzt): ' + st2);
 } catch (e) {
   fehler++;
   console.log('ABBRUCH:', e.message);

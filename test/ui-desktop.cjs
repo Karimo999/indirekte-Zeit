@@ -50,20 +50,27 @@ function mock({ dateien, ordner }) {
         if (cmd === 'dateien_sammeln') return args.pfade.flatMap((p) => ordner[p] || [p]);
         if (cmd === 'datei_lesen') { if (!dateien[args.pfad]) throw 'nicht gefunden'; return ab(dateien[args.pfad]); }
         if (cmd === 'schreiben') {
-          if (!args.ordner && args.original.startsWith('C:\\Schreibgeschuetzt')) throw 'keine Schreibberechtigung';
-          const basis = args.ordner || args.original.replace(/\\[^\\]+$/, '');
-          const ziel = basis + '\\' + args.relativ.split('/').join('\\');
+          if (!args.ordner) throw 'ohne gewählten Ordner wird nicht gespeichert';
+          if (args.ordner.startsWith('C:\\Gesperrt')) throw 'keine Schreibberechtigung';
+          const ziel = args.ordner + '\\' + args.relativ.split('/').join('\\');
           m.geschrieben.push({ ziel, bytes: args.daten.length, kopf: String.fromCharCode(...args.daten.slice(0, 5)) });
           return ziel;
         }
+        if (cmd === 'schreiben_als') {
+          if (args.ziel.startsWith('C:\\Gesperrt')) throw 'keine Schreibberechtigung';
+          m.geschrieben.push({ ziel: args.ziel, bytes: args.daten.length, kopf: String.fromCharCode(...args.daten.slice(0, 5)), als: true });
+          return args.ziel;
+        }
+        if (cmd === 'vorhandene_dateien') return args.namen.filter((n) => (m.vorhanden || []).includes(n));
         if (cmd === 'im_ordner_zeigen') { m.gezeigt = args.pfad; return null; }
         throw new Error('unbekannter Befehl ' + cmd);
       },
     },
     app: { getVersion: async () => '1.1.0' },
     dialog: {
-      async open(opts) { m.auswahl.push(opts); return opts.directory ? 'C:\\Users\\Moritz\\Documents' : m.naechsteAuswahl || null; },
-      async ask() { return true; },
+      async open(opts) { m.auswahl.push(opts); return opts.directory ? m.ordnerWahl : m.naechsteAuswahl || null; },
+      async save(opts) { m.auswahl.push(opts); return m.speichernWahl; },
+      async ask(text) { m.fragen = (m.fragen || []).concat(text); return m.askAntwort !== undefined ? m.askAntwort : true; },
     },
     webview: { getCurrentWebview: () => ({ onDragDropEvent: (cb) => { m.drag = cb; return Promise.resolve(() => {}); } }) },
     updater: { async check() { return m.update; } },
@@ -147,18 +154,34 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     await page.waitForTimeout(1200);
     await page.screenshot({ path: path.join(OUT, `${schema}-5-fehler.png`) });
 
-    // Speichern (eine Datei liegt in einem schreibgeschuetzten Ordner -> Ordnerauswahl)
+    // Speichern: mehrere Dateien -> Ordner waehlen
     const vorher = await page.textContent('#btn-speichern');
+    pruefe(vorher === '7 Dateien speichern …', `Knopf „${vorher}“`);
+    // a) Ordnerauswahl abgebrochen
+    await page.evaluate(() => { window.__mock.ordnerWahl = null; });
+    await page.click('#btn-speichern');
+    await page.waitForTimeout(400);
+    let m = await page.evaluate(() => window.__mock);
+    const ordnerDialog = m.auswahl[m.auswahl.length - 1];
+    pruefe(ordnerDialog.directory === true && ordnerDialog.defaultPath === 'C:\\Users\\Moritz\\Desktop', `Ordnerdialog startet beim Original (${ordnerDialog.defaultPath})`);
+    pruefe(m.geschrieben.length === 0 && !(await page.isDisabled('#btn-speichern')), 'Abbrechen speichert nichts');
+    // b) Datei gibt es schon, Ersetzen abgelehnt
+    await page.evaluate(() => { Object.assign(window.__mock, { ordnerWahl: 'C:\\Users\\Moritz\\Documents\\Ergaenzt', vorhanden: ['A_ergaenzt.pdf'], askAntwort: false }); });
+    await page.click('#btn-speichern');
+    await page.waitForTimeout(400);
+    m = await page.evaluate(() => window.__mock);
+    pruefe(m.fragen && m.fragen[m.fragen.length - 1].includes('A_ergaenzt.pdf') && m.geschrieben.length === 0, 'vorhandene Datei: Rückfrage, nichts ersetzt');
+    // c) Ersetzen bestaetigt
+    await page.evaluate(() => { window.__mock.askAntwort = true; });
     await page.click('#btn-speichern');
     await page.waitForTimeout(1200);
-    const m = await page.evaluate(() => window.__mock);
+    m = await page.evaluate(() => window.__mock);
     console.log('GESCHRIEBEN:\n' + m.geschrieben.map((g) => `${g.ziel} (${g.bytes} B, ${g.kopf})`).join('\n'));
-    pruefe(vorher.includes('7 Dateien'), `Knopf „${vorher}“`);
     pruefe(m.geschrieben.length === 7, '7 Dateien geschrieben');
-    pruefe(m.geschrieben.some((g) => g.ziel === 'C:\\Users\\Moritz\\Desktop\\Nachweis_Oktober_ergaenzt.pdf'), 'neben dem Original gespeichert');
-    pruefe(m.geschrieben.some((g) => g.ziel === 'C:\\Users\\Moritz\\Downloads\\Massnahmen_ergaenzt\\Nachweis_Teilmonat_ergaenzt.pdf'), 'ZIP-Inhalt in Ordner neben der ZIP');
-    pruefe(m.geschrieben.some((g) => g.ziel === 'C:\\Users\\Moritz\\Documents\\Nur_lesen_ergaenzt.pdf'), 'schreibgeschützt -> gewählter Ordner');
+    pruefe(m.geschrieben.every((g) => g.ziel.startsWith('C:\\Users\\Moritz\\Documents\\Ergaenzt\\') && g.ziel.endsWith('_ergaenzt.pdf')), 'alle im gewählten Ordner');
+    pruefe(new Set(m.geschrieben.map((g) => g.ziel)).size === 7, 'keine Datei überschreibt eine andere');
     pruefe(m.geschrieben.every((g) => g.kopf === '%PDF-'), 'alles PDF-Daten');
+    pruefe((await page.textContent('#status')) === '7 Dateien gespeichert in Ergaenzt', 'Status nennt den Ordner');
     pruefe(await page.isVisible('#btn-zeigen'), '„Im Ordner zeigen“ sichtbar');
     pruefe(await page.isDisabled('#btn-speichern'), 'Speichern danach deaktiviert');
     await page.click('#btn-zeigen');
@@ -215,6 +238,28 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
       const neu = await page.evaluate(() => window.__mock.neustart);
       pruefe(neu === 1, 'Update installiert und Neustart ausgelöst');
     }
+
+    // eine Datei -> „Speichern unter“, startet im zuletzt gewaehlten Ordner
+    await page.click('#btn-leeren');
+    await ablegen(page, ['C:\\Users\\Moritz\\Desktop\\Nachweis_Oktober.pdf']);
+    await page.waitForTimeout(800);
+    pruefe((await page.textContent('#btn-speichern')) === 'Speichern …', 'Knopf „Speichern …“ bei einer Datei');
+    await page.evaluate(() => { window.__mock.speichernWahl = 'C:\\Users\\Moritz\\Documents\\Ergaenzt\\Oktober_final.pdf'; window.__mock.geschrieben = []; });
+    await page.click('#btn-speichern');
+    await page.waitForTimeout(500);
+    m = await page.evaluate(() => window.__mock);
+    const sd = m.auswahl[m.auswahl.length - 1];
+    pruefe(sd.defaultPath === 'C:\\Users\\Moritz\\Documents\\Ergaenzt\\Nachweis_Oktober_ergaenzt.pdf', `Speichern-unter startet im letzten Ordner (${sd.defaultPath})`);
+    pruefe(m.geschrieben.length === 1 && m.geschrieben[0].als && m.geschrieben[0].ziel.endsWith('Oktober_final.pdf'), 'unter gewähltem Namen gespeichert');
+    pruefe((await page.textContent('#status')) === 'Gespeichert als Oktober_final.pdf', 'Status „Gespeichert als …“');
+    // Schreibfehler wird gemeldet (Standortwechsel macht die Datei wieder speicherbar)
+    await page.click('#st-segeberg');
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { window.__mock.speichernWahl = 'C:\\Gesperrt\\x.pdf'; });
+    await page.click('#btn-speichern');
+    await page.waitForTimeout(500);
+    const st = await page.textContent('#status');
+    pruefe(st.includes('Nicht gespeichert') && st.includes('keine Schreibberechtigung') && !(await page.isDisabled('#btn-speichern')), 'Schreibfehler gemeldet, erneut speicherbar');
 
     // schmales Fenster
     await page.setViewportSize({ width: 820, height: 560 });

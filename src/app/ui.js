@@ -304,7 +304,8 @@ export function starte(p) {
     const offen = offeneDateien().length;
     const btn = $('btn-speichern');
     btn.disabled = !offen || state.beschaeftigt;
-    btn.textContent = offen > 1 ? `${offen} Dateien speichern` : 'Speichern';
+    const punkte = p.speichernMitDialog ? ' …' : '';
+    btn.textContent = (offen > 1 ? `${offen} Dateien speichern` : 'Speichern') + punkte;
   }
 
   // ---------------------------------------------------------------- Ansicht „Mitarbeiter“

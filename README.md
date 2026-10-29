@@ -20,8 +20,9 @@ zwei Nachkommastellen, kaufmännisch gerundet.
 
 1. Standort wählen.
 2. PDF-Dateien, einen Ordner oder die ZIP-Datei aus Kilanka ins Fenster ziehen (oder „Dateien öffnen …“).
-3. Werte prüfen, **Speichern**. Die ergänzte Datei liegt neben dem Original und heißt `…_ergaenzt.pdf`.
-   Aus einer ZIP-Datei landen die Dateien im Ordner `<ZIP-Name>_ergaenzt` daneben.
+3. Werte prüfen, **Speichern …**: Bei einer Datei öffnet sich „Speichern unter“, bei mehreren wählst du den
+   Ordner. Die ergänzten Dateien heißen `…_ergaenzt.pdf`; gibt es eine Datei dort schon, fragt die App vor dem
+   Ersetzen. Der zuletzt gewählte Ordner wird beim nächsten Mal vorgeschlagen. Das Original wird nie überschrieben.
 
 4. **Mitarbeiter** (Umschalter über der Liste): indirekte Stunden je betreuender Fachkraft und Monat, summiert
    über alle geladenen Nachweise. Diese Werte gehören ins Stundenkonto in Kilanka, als manuelle Buchung:

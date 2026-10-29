@@ -42,58 +42,77 @@ async function lesen(pfade) {
   return { dateien, fehler };
 }
 
-/** Relativer Zielpfad neben dem Original: Datei_ergaenzt.pdf bzw. Export_ergaenzt/Datei_ergaenzt.pdf bei ZIP */
-function relativerZiel(eintrag) {
-  const q = eintrag.datei.quelle;
-  if (q.zip) return q.zip.replace(/\.zip$/i, '') + '_ergaenzt/' + eintrag.name;
-  return eintrag.name;
-}
+const ordnerVon = (pfad) => {
+  const i = Math.max(pfad.lastIndexOf('/'), pfad.lastIndexOf('\\'));
+  return i > 0 ? pfad.slice(0, i) : pfad;
+};
+const verbinden = (ordner, name) => ordner + (ordner.includes('\\') && !ordner.includes('/') ? '\\' : '/') + name;
 
-async function schreiben(eintrag, ordner) {
-  return invoke('schreiben', {
-    original: eintrag.datei.quelle.pfad,
-    relativ: relativerZiel(eintrag),
-    ordner: ordner || null,
-    daten: Array.from(eintrag.daten),
+// zuletzt gewaehlter Speicherort (Dialog startet dort)
+const SPEICHERORT = 'speicherort';
+const letzterOrdner = () => { try { return localStorage.getItem(SPEICHERORT); } catch (_) { return null; } };
+const merkeOrdner = (o) => { try { localStorage.setItem(SPEICHERORT, o); } catch (_) { /* egal */ } };
+
+/** gleiche Namen in einem Speichervorgang unterscheiden: Datei_ergaenzt.pdf, Datei_ergaenzt (2).pdf … */
+function eindeutig(namen) {
+  const zaehler = new Map();
+  return namen.map((n) => {
+    const k = n.toLowerCase();
+    const z = (zaehler.get(k) || 0) + 1;
+    zaehler.set(k, z);
+    return z === 1 ? n : n.replace(/\.pdf$/i, ` (${z}).pdf`);
   });
 }
 
+/** Speichern: eine Datei ueber „Speichern unter“, mehrere in einen gewaehlten Ordner */
 async function speichern(liste) {
-  const gespeichert = [];
-  let offen = [];
-  let letzterFehler = '';
-  for (const e of liste) {
-    try {
-      gespeichert.push({ datei: e.datei, ziel: await schreiben(e, null) });
-    } catch (err) {
-      letzterFehler = String(err);
-      offen.push(e);
-    }
-  }
-  // Ordner nicht beschreibbar: anderen Ordner waehlen lassen
-  if (offen.length) {
-    const ordner = await dialog.open({
-      directory: true,
-      title: `Neben dem Original kann nicht gespeichert werden – Ordner wählen (${offen.length} ${offen.length === 1 ? 'Datei' : 'Dateien'})`,
+  const start = letzterOrdner() || ordnerVon(liste[0].datei.quelle.pfad);
+  if (liste.length === 1) {
+    const e = liste[0];
+    const ziel = await dialog.save({
+      title: 'Ergänzte Datei speichern',
+      defaultPath: verbinden(start, e.name),
+      filters: [{ name: 'PDF-Dokument', extensions: ['pdf'] }],
     });
-    if (ordner) {
-      const nochOffen = [];
-      for (const e of offen) {
-        try {
-          gespeichert.push({ datei: e.datei, ziel: await schreiben(e, ordner) });
-        } catch (err) {
-          letzterFehler = String(err);
-          nochOffen.push(e);
-        }
-      }
-      offen = nochOffen;
+    if (!ziel) return null;
+    try {
+      const pfad = await invoke('schreiben_als', { ziel, original: e.datei.quelle.pfad, daten: Array.from(e.daten) });
+      merkeOrdner(ordnerVon(pfad));
+      return { gespeichert: [{ datei: e.datei, ziel: pfad }], fehler: [], text: `Gespeichert als ${dateiname(pfad)}` };
+    } catch (err) {
+      return { gespeichert: [], fehler: [{ datei: e.datei, text: `${e.name} (${err})` }] };
     }
   }
-  const fehler = offen.map((e) => ({ datei: e.datei, text: `${e.name} (${letzterFehler})` }));
-  const text = gespeichert.length === 1
-    ? `Gespeichert als ${dateiname(gespeichert[0].ziel)}`
-    : `${gespeichert.length} Dateien gespeichert`;
-  return { gespeichert, fehler, text };
+
+  const ordner = await dialog.open({
+    directory: true,
+    title: `Ordner für ${liste.length} ergänzte Dateien wählen`,
+    defaultPath: start,
+  });
+  if (!ordner) return null;
+  const namen = eindeutig(liste.map((e) => e.name));
+  let vorhanden = [];
+  try { vorhanden = await invoke('vorhandene_dateien', { ordner, namen }); } catch (_) { vorhanden = []; }
+  if (vorhanden.length) {
+    const frage = vorhanden.length === 1
+      ? `„${vorhanden[0]}“ gibt es in diesem Ordner schon. Ersetzen?`
+      : `${vorhanden.length} der Dateien gibt es in diesem Ordner schon. Ersetzen?`;
+    const ok = await dialog.ask(frage, { title: 'Indirekte Zeit', kind: 'warning', okLabel: 'Ersetzen', cancelLabel: 'Abbrechen' });
+    if (!ok) return null;
+  }
+  const gespeichert = [];
+  const fehler = [];
+  for (let i = 0; i < liste.length; i++) {
+    const e = liste[i];
+    try {
+      const ziel = await invoke('schreiben', { original: e.datei.quelle.pfad, relativ: namen[i], ordner, daten: Array.from(e.daten) });
+      gespeichert.push({ datei: e.datei, ziel });
+    } catch (err) {
+      fehler.push({ datei: e.datei, text: `${namen[i]} (${err})` });
+    }
+  }
+  if (gespeichert.length) merkeOrdner(ordner);
+  return { gespeichert, fehler, text: `${gespeichert.length} Dateien gespeichert in ${dateiname(ordner) || ordner}` };
 }
 
 async function main() {
@@ -127,6 +146,7 @@ async function main() {
       window.addEventListener('drop', (e) => e.preventDefault());
     },
     speichern,
+    speichernMitDialog: true,
     zeigen: (pfad) => invoke('im_ordner_zeigen', { pfad }).catch(() => {}),
     updatesEinrichten(ui) {
       let update = null;
