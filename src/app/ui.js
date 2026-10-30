@@ -190,7 +190,7 @@ export function starte(p) {
     standort: standortById(speicher.get('standort') || 'segeberg').id,
     dateien: [],
     auswahl: null, // { id, nachweis }
-    ansicht: 'nachweise', // oder 'mitarbeiter'
+    ansicht: 'nachweise', // oder 'stundenkonto'
     maAuswahl: null, // Schluessel der gewaehlten Mitarbeiter-Gruppe
     beschaeftigt: false,
     zuletzt: null, // zuletzt gespeicherte Datei (fuer „Im Ordner zeigen“)
@@ -204,21 +204,25 @@ export function starte(p) {
     s.title = text || '';
     s.classList.toggle('fehler', !!fehler);
   }
-  function standardStatus() {
+  function standardStatus(gruppen) {
     $('btn-zeigen').hidden = true;
-    const pdfs = state.dateien.filter((d) => !istZeitnachweis(d));
-    const alle = pdfs.flatMap((d) => (d.ergebnis.nachweise.length ? d.ergebnis.nachweise : [null]));
-    const excel = state.dateien.length - pdfs.length;
     if (!state.dateien.length) return status('');
-    if (state.ansicht === 'mitarbeiter') {
-      const g = mitarbeiterGruppen(state.dateien, state.standort);
-      return status(g.length ? `${anzahl(new Set(g.map((x) => x.fachkraft)).size, 'Mitarbeiter', 'Mitarbeiter')} · zusammen ${DE.format(g.reduce((s, x) => s + x.indirekt, 0))} Std. indirekt` : '');
+    if (state.ansicht === 'stundenkonto') {
+      const g = gruppen || mitarbeiterGruppen(state.dateien, state.standort);
+      if (!g.length) return status('');
+      const leute = new Set(g.map((x) => x.fachkraft)).size;
+      return status(`${anzahl(leute, 'Mitarbeiter', 'Mitarbeiter')} · zusammen ${DE.format(g.reduce((s, x) => s + x.indirekt, 0))} Std.`);
     }
-    const fehler = alle.filter((n) => !n || n.status === 'fehler').length;
+    const zeilen = pdfDateien().flatMap((d) => (d.ergebnis.nachweise.length ? d.ergebnis.nachweise.map((n) => ({ d, n })) : [{ d, n: null }]));
+    const bereit = zeilen.filter(({ d, n }) => n && n.status === 'bereit' && !d.gespeichert).length;
+    const gespeichert = zeilen.filter(({ d, n }) => n && n.status === 'bereit' && d.gespeichert).length;
+    const schon = zeilen.filter(({ n }) => n && n.status === 'bereitsErgaenzt').length;
+    const fehler = zeilen.filter(({ n }) => !n || n.status === 'fehler').length;
     const teile = [];
-    if (alle.length) teile.push(anzahl(alle.length, 'Nachweis', 'Nachweise'));
+    if (bereit) teile.push(`${bereit} ${bereit === 1 ? 'Nachweis' : 'Nachweise'} bereit`);
+    if (gespeichert) teile.push(`${gespeichert} gespeichert`);
+    if (schon) teile.push(`${schon} bereits ergänzt`);
     if (fehler) teile.push(`${fehler} nicht eingetragen`);
-    if (excel) teile.push(`${anzahl(excel, 'Zeitnachweis', 'Zeitnachweise')} unter „Mitarbeiter“`);
     status(teile.join(' · '));
   }
 
@@ -273,11 +277,12 @@ export function starte(p) {
     }
     state.beschaeftigt = false;
     if (erste) state.auswahl = { id: erste.id, nachweis: 0 };
-    // nur Zeitnachweise abgelegt: gleich die Werte je Mitarbeiter zeigen
-    if (neueZeitnachweise && !neueNachweise) state.ansicht = 'mitarbeiter';
+    // nur eine Art abgelegt: deren Reiter zeigen
+    if (neueZeitnachweise && !neueNachweise) state.ansicht = 'stundenkonto';
+    if (neueNachweise && !neueZeitnachweise) state.ansicht = 'nachweise';
     renderAlles();
     if (fehler.length) status(fehler.join(' '), true);
-    else if (!eingaenge.length) status('Keine PDF-Dateien gefunden.', true);
+    else if (!eingaenge.length) status('Keine PDF- oder Excel-Dateien gefunden.', true);
   }
 
   function standortSetzen(id) {
@@ -296,6 +301,7 @@ export function starte(p) {
   function offeneDateien() {
     return state.dateien.filter((d) => d.ergebnis.ausgabe && !d.gespeichert);
   }
+  const pdfDateien = () => state.dateien.filter((d) => !istZeitnachweis(d));
 
   async function speichern() {
     const liste = offeneDateien();
@@ -339,8 +345,8 @@ export function starte(p) {
   }
 
   function statusZeile(n, d) {
-    if (!n) return { text: d.ergebnis.fehler || 'Kein Leistungsnachweis erkannt.', fehler: true };
-    if (n.status === 'fehler') return { text: n.fehlertext, fehler: true };
+    if (!n) return { text: 'Nicht lesbar', fehler: true };
+    if (n.status === 'fehler') return { text: 'Nicht eingetragen', fehler: true };
     if (n.status === 'bereitsErgaenzt') return { text: 'Bereits ergänzt' };
     if (d.gespeichert) return { text: 'Gespeichert' };
     return null;
@@ -349,8 +355,8 @@ export function starte(p) {
   function renderListe() {
     const liste = $('liste');
     liste.replaceChildren();
-    const pdfs = state.dateien.filter((d) => !istZeitnachweis(d));
-    if (!pdfs.length) liste.append(el('div', 'liste-hinweis', 'Keine Leistungsnachweise geladen. Die Zeitnachweise stehen unter „Mitarbeiter“.'));
+    const pdfs = pdfDateien();
+    if (!pdfs.length) liste.append(el('div', 'liste-hinweis', 'Keine Leistungsnachweise geladen. Die Zeitnachweise stehen unter „Stundenkonto“.'));
     for (const d of pdfs) {
       const nachweise = d.ergebnis.nachweise.length ? d.ergebnis.nachweise : [null];
       nachweise.forEach((n, i) => {
@@ -370,7 +376,7 @@ export function starte(p) {
         z.append(links);
         // nicht eingetragene (nur berechnete) Werte grau
         const grau = n && n.status === 'fehler' ? ' leise' : '';
-        z.append(el('div', 'zahl', n && n.direktText ? n.direktText : '–'));
+        z.append(el('div', 'zahl direkt', n && n.direktText ? n.direktText : '–'));
         z.append(el('div', 'zahl' + grau, n && n.indirektText ? n.indirektText : '–'));
         z.append(el('div', 'zahl gesamt' + grau, n && n.gesamtText ? n.gesamtText : '–'));
         z.addEventListener('click', () => {
@@ -392,23 +398,30 @@ export function starte(p) {
     btn.textContent = (offen > 1 ? `${offen} Dateien speichern` : 'Speichern') + punkte;
   }
 
-  // ---------------------------------------------------------------- Ansicht „Mitarbeiter“
-  function renderAnsicht() {
-    const ma = state.ansicht === 'mitarbeiter';
-    $('ans-nachweise').setAttribute('aria-checked', String(!ma));
-    $('ans-mitarbeiter').setAttribute('aria-checked', String(ma));
-    $('kopf-name').textContent = ma ? 'Mitarbeiter' : 'Nachweis';
-    $('detail-kopf').hidden = ma;
-    $('vorschau').hidden = ma;
-    $('ma-detail').hidden = !ma;
+  // ---------------------------------------------------------------- Reiter
+  function renderReiter(gruppen) {
+    const sk = state.ansicht === 'stundenkonto';
+    $('tab-nachweise').setAttribute('aria-selected', String(!sk));
+    $('tab-stundenkonto').setAttribute('aria-selected', String(sk));
+    const zahlNachweise = pdfDateien().reduce((s, d) => s + Math.max(1, d.ergebnis.nachweise.length), 0);
+    $('anz-nachweise').textContent = String(zahlNachweise);
+    $('anz-stundenkonto').textContent = String(gruppen.length);
+    $('liste-bereich').classList.toggle('stundenkonto', sk);
+    const kopf = $('liste-kopf');
+    kopf.replaceChildren();
+    if (sk) kopf.append(el('span', null, 'Mitarbeiter'), el('span', null, 'Indirekt'));
+    else kopf.append(el('span', null, 'Klient'), el('span', 'direkt', 'Direkt'), el('span', null, 'Indirekt'), el('span', null, 'Gesamt'));
+    $('liste').setAttribute('aria-label', sk ? 'Stundenkonto je Mitarbeiter' : 'Leistungsnachweise');
+    $('detail-kopf').hidden = sk;
+    $('vorschau').hidden = sk;
+    $('ma-detail').hidden = !sk;
   }
 
-  function renderMitarbeiter() {
-    const gruppen = mitarbeiterGruppen(state.dateien, state.standort);
+  function renderStundenkonto(gruppen) {
     if (!gruppen.some((g) => g.key === state.maAuswahl)) state.maAuswahl = gruppen.length ? gruppen[0].key : null;
     const liste = $('liste');
     liste.replaceChildren();
-    if (!gruppen.length) liste.append(el('div', 'liste-hinweis', 'Für keinen Nachweis konnten indirekte Stunden berechnet werden.'));
+    if (!gruppen.length) liste.append(el('div', 'liste-hinweis', 'Für keinen Mitarbeiter konnte die indirekte Zeit berechnet werden.'));
     for (const g of gruppen) {
       const z = el('button', 'zeile');
       z.type = 'button';
@@ -416,16 +429,17 @@ export function starte(p) {
       z.setAttribute('aria-selected', String(g.key === state.maAuswahl));
       const links = el('div', 'links');
       links.append(el('div', 'name', g.fachkraft));
-      const herkunft = g.quelle === 'zeitnachweis' ? (g.zeitnachweise.length > 1 ? `${g.zeitnachweise.length} Zeitnachweise` : 'Zeitnachweis') : anzahl(g.nachweise.length, 'Nachweis', 'Nachweise');
+      const herkunft = g.quelle === 'zeitnachweis'
+        ? (g.zeitnachweise.length > 1 ? `aus ${g.zeitnachweise.length} Zeitnachweisen` : 'aus dem Zeitnachweis')
+        : (g.nachweise.length > 1 ? `aus ${g.nachweise.length} Leistungsnachweisen` : 'aus dem Leistungsnachweis');
       links.append(el('div', 'info', `${g.monatText} · ${herkunft}`));
-      z.append(links, el('div', 'zahl', DE.format(g.direkt)), el('div', 'zahl gesamt', DE.format(g.indirekt)), el('div', 'zahl', DE.format(g.gesamt)));
+      z.append(links, el('div', 'zahl gesamt', DE.format(g.indirekt)));
       z.addEventListener('click', () => {
         state.maAuswahl = g.key;
-        renderMitarbeiter();
+        renderStundenkonto(gruppen);
       });
       liste.append(z);
     }
-    renderSpeichern();
 
     const box = $('ma-detail');
     box.replaceChildren();
@@ -433,67 +447,67 @@ export function starte(p) {
     if (!g) return;
     const herkunft = g.quelle === 'zeitnachweis'
       ? `Zeitnachweis ${g.zeitnachweise.map((x) => x.zn.zeitraum).join(', ')}`
-      : anzahl(g.nachweise.length, 'Nachweis', 'Nachweise');
+      : (g.nachweise.length > 1 ? `${g.nachweise.length} Leistungsnachweise` : 'Leistungsnachweis');
     box.append(el('p', 'titel', g.fachkraft), el('p', 'leise', `${g.monatText} · ${herkunft}`));
-    box.append(el('p', 'abschnitt', 'In Kilanka als manuelle Buchung im Stundenkonto eintragen:'));
+
+    box.append(el('p', 'abschnitt', 'In Kilanka als manuelle Buchung eintragen'));
     box.append(el('p', 'leise', 'Mitarbeiter → Konten → Stundenkonto → Plus oben rechts'));
     const tabelle = el('table', 'buchung');
-    const zeile = (label, wert) => {
+    const zeile = (label, wert, gross) => {
       const tr = el('tr');
       const k = el('button', 'link', 'Kopieren');
       k.type = 'button';
       k.addEventListener('click', () => kopieren(wert, k));
       const td = el('td');
       td.append(k);
-      tr.append(el('th', null, label), el('td', 'wert', wert), td);
+      tr.append(el('th', null, label), el('td', gross ? 'wert gross' : 'wert', wert), td);
       tabelle.append(tr);
     };
     zeile('Stichtag', g.stichtag || '');
-    zeile('Buchungswert', DE.format(g.indirekt));
+    zeile('Buchungswert', DE.format(g.indirekt), true);
     zeile('Bemerkung', `Indirekte Zeit ${g.monatText}`);
     box.append(tabelle);
-    if (g.kappung) {
-      box.append(el('p', 'leise', `Zusammen ${DE.format(g.kappung.vorher)} Std. – für den Mitarbeiter höchstens ${DE.format(g.kappung.grenze)} Std. (${g.kappung.text}).`));
-    }
-    box.append(el('p', 'abschnitt', 'Zusammensetzung'));
-    const ul = el('ul', 'ma-liste');
-    for (const { d, zn } of g.zeitnachweise || []) {
-      for (const k of d.zn.klienten) {
-        const li = el('li');
-        li.append(el('div', null, `${k.name} · ${DE.format(k.indirekt)} Std.`));
-        const tage = `${anzahl(k.eintraege, 'Eintrag', 'Einträge')} mit Klient, ${DE.format(k.direkt)} Std.`;
-        li.append(el('div', 'leise', `${tage} · ${k.formel}`));
-        ul.append(li);
-      }
-      if (!d.zn.klienten.length) ul.append(el('li', 'leise', 'Keine Einträge mit Klient.'));
-      const li = el('li', 'leise');
-      li.textContent = `${d.name} · ${zn.zeitraum}${d.zn.ohneKlient ? ` · ${anzahl(d.zn.ohneKlient, 'Eintrag', 'Einträge')} ohne Klient (z. B. Krank, Termine) nicht gezählt` : ''}`;
-      ul.append(li);
+
+    // So wurde gerechnet
+    box.append(el('p', 'abschnitt', 'So berechnet'));
+    const rechnung = el('table', 'rechnung');
+    const posten = (titel, erklaerung, wert) => {
+      const tr = el('tr');
+      const td = el('td');
+      td.append(el('div', null, titel));
+      if (erklaerung) td.append(el('div', 'leise', erklaerung));
+      tr.append(td, el('td', 'zahl', wert));
+      rechnung.append(tr);
+    };
+    for (const { d } of g.zeitnachweise || []) {
+      for (const k of d.zn.klienten) posten(k.name, k.formel, `${DE.format(k.indirekt)} Std.`);
     }
     for (const { d, n } of g.nachweise) {
-      const li = el('li');
-      li.append(el('div', null, `${n.name || d.name} · ${n.indirektText} Std.`));
-      const info = [n.zeitraum, n.formel, d.name].filter(Boolean).join(' · ');
-      li.append(el('div', 'leise', info));
-      if (n.status === 'fehler') li.append(el('div', 'leise', 'In der PDF nicht eingetragen, für das Stundenkonto trotzdem mitgezählt.'));
-      ul.append(li);
+      const fehlt = n.status === 'fehler' ? ' · in der PDF nicht eingetragen, hier trotzdem mitgezählt' : '';
+      posten(n.name || d.name, `${[n.zeitraum, n.formel].filter(Boolean).join(' · ')}${fehlt}`, `${n.indirektText} Std.`);
+    }
+    if (g.kappung) {
+      posten('Obergrenze für den Mitarbeiter insgesamt', `zusammen ${DE.format(g.kappung.vorher)} Std., höchstens ${DE.format(g.kappung.grenze)} Std. (${g.kappung.text})`, `${DE.format(g.kappung.grenze)} Std.`);
+    }
+    box.append(rechnung);
+
+    const notizen = [];
+    for (const { d, zn } of g.zeitnachweise || []) {
+      if (!d.zn.klienten.length) notizen.push(`${d.name}: keine Einträge mit Klient.`);
+      if (d.zn.ohneKlient) notizen.push(`${anzahl(d.zn.ohneKlient, 'Eintrag', 'Einträge')} ohne Klient (z. B. Krank, Termine) ${d.zn.ohneKlient === 1 ? 'zählt' : 'zählen'} nicht${g.zeitnachweise.length > 1 ? ` (${d.name}, ${zn.zeitraum})` : ''}.`);
     }
     for (const { d, n, wie } of g.doppelt) {
-      const li = el('li');
-      const text = d.art === 'zeitnachweis'
-        ? `${d.name}: derselbe Zeitnachweis wie ${wie} – nur einmal gezählt.`
-        : `${n.name || d.name} · ${d.name}: derselbe Nachweis wie in ${wie} – nur einmal gezählt.`;
-      li.append(el('div', 'leise', text));
-      ul.append(li);
+      notizen.push(d.art === 'zeitnachweis'
+        ? `${d.name} ist derselbe Zeitnachweis wie ${wie} und zählt nur einmal.`
+        : `${n.name || d.name} in ${d.name} ist derselbe Nachweis wie in ${wie} und zählt nur einmal.`);
     }
-    box.append(ul);
     if (g.quelle === 'zeitnachweis') {
-      if (g.ersetzt) box.append(el('p', 'leise hinweis-unten', `Für diesen Monat ${g.ersetzt === 1 ? 'ist auch ein Leistungsnachweis' : `sind auch ${g.ersetzt} Leistungsnachweise`} dieses Mitarbeiters geladen. Gezählt wird nur der Zeitnachweis, damit nichts doppelt gebucht wird.`));
-      box.append(el('p', 'leise hinweis-unten', 'Gezählt werden alle Einträge mit Klient, die Regeln wie beim Leistungsnachweis je Klient.'));
+      if (g.ersetzt) notizen.push(`Für diesen Monat ${g.ersetzt === 1 ? 'ist auch ein Leistungsnachweis' : `sind auch ${g.ersetzt} Leistungsnachweise`} dieses Mitarbeiters geladen. Gezählt wird nur der Zeitnachweis, damit nichts doppelt gebucht wird.`);
     } else {
-      if (g.fachkraft.startsWith('Ohne Angabe')) box.append(el('p', 'leise', 'In diesen Nachweisen steht keine betreuende Fachkraft.'));
-      box.append(el('p', 'leise hinweis-unten', 'Grundlage ist die betreuende Fachkraft im Nachweis. Hat eine Vertretung Tage übernommen, steht das nicht in der PDF.'));
+      if (g.fachkraft.startsWith('Ohne Angabe')) notizen.push('In diesen Nachweisen steht keine betreuende Fachkraft.');
+      notizen.push('Grundlage ist die betreuende Fachkraft im Nachweis. Vertretungen stehen nicht in der PDF.');
     }
+    for (const t of notizen) box.append(el('p', 'leise notiz', t));
   }
 
   function renderDetail() {
@@ -505,13 +519,14 @@ export function starte(p) {
       return;
     }
     kopf.append(el('p', 'titel', (n && n.name) || d.name));
-    const quelle = d.quelle && d.quelle.zip ? `${d.quelle.zip} → ${d.name}` : d.name;
-    kopf.append(el('p', 'leise', [n && n.zeitraum, quelle].filter(Boolean).join(' · ')));
-    if (n && n.formel && n.indirektText) {
-      kopf.append(el('p', null, `Indirekt: ${n.formel} = ${n.indirektText} Std. · Gesamt: ${n.gesamtText} Std.`));
+    const meta = [n && n.zeitraum, n && n.fachkraft ? `Fachkraft: ${n.fachkraft}` : null].filter(Boolean);
+    kopf.append(el('p', 'leise', meta.length ? meta.join(' · ') : d.name));
+    if (n && n.indirektText) {
+      kopf.append(el('p', 'werte', `Indirekt ${n.indirektText} Std. · Gesamt ${n.gesamtText} Std.`));
     }
+    if (n && n.formel && n.indirektText) kopf.append(el('p', 'leise', `Berechnung: ${n.formel}`));
     if (!n) kopf.append(el('p', 'fehler', d.ergebnis.fehler || 'Kein Leistungsnachweis erkannt.'));
-    else if (n.status === 'fehler') kopf.append(el('p', 'fehler', 'Nicht eingetragen: ' + n.fehlertext));
+    else if (n.status === 'fehler') kopf.append(el('p', 'fehler', `Nicht in die PDF eingetragen: ${n.fehlertext}`));
     else if (n.status === 'bereitsErgaenzt') kopf.append(el('p', 'leise', 'Diese Datei ist bereits ergänzt – es gibt nichts zu speichern.'));
     if (n) for (const h of n.hinweise) kopf.append(el('p', 'leise', h));
     if (d.ergebnis.fehler && n) kopf.append(el('p', 'fehler', d.ergebnis.fehler));
@@ -523,24 +538,27 @@ export function starte(p) {
     const leer = state.dateien.length === 0;
     $('leer').hidden = !leer;
     $('arbeit').hidden = leer;
+    $('reiter').hidden = leer;
+    $('btn-oeffnen').hidden = leer;
     $('btn-leeren').hidden = leer;
+    $('btn-speichern').hidden = leer || state.ansicht !== 'nachweise';
     renderStandort();
+    let gruppen = [];
     if (!leer) {
+      gruppen = mitarbeiterGruppen(state.dateien, state.standort);
       if (!aktuell().d) {
-        const erstePdf = state.dateien.find((d) => !istZeitnachweis(d));
+        const erstePdf = pdfDateien()[0];
         state.auswahl = erstePdf ? { id: erstePdf.id, nachweis: 0 } : null;
       }
-      renderAnsicht();
-      if (state.ansicht === 'mitarbeiter') renderMitarbeiter();
+      renderReiter(gruppen);
+      if (state.ansicht === 'stundenkonto') renderStundenkonto(gruppen);
       else {
         renderListe();
         renderDetail();
       }
-    } else {
-      $('btn-speichern').disabled = true;
-      $('btn-speichern').textContent = 'Speichern';
     }
-    standardStatus();
+    renderSpeichern();
+    standardStatus(gruppen);
   }
 
   // ---------------------------------------------------------------- Vorschau (pdf.js)
@@ -647,13 +665,20 @@ export function starte(p) {
   });
   const oeffnen = () => hinzufuegen(() => p.oeffnen());
   $('btn-oeffnen').addEventListener('click', oeffnen);
+  $('btn-oeffnen-leer').addEventListener('click', oeffnen);
   const ansichtSetzen = (a) => {
     if (state.ansicht === a) return;
     state.ansicht = a;
     renderAlles();
   };
-  $('ans-nachweise').addEventListener('click', () => ansichtSetzen('nachweise'));
-  $('ans-mitarbeiter').addEventListener('click', () => ansichtSetzen('mitarbeiter'));
+  $('tab-nachweise').addEventListener('click', () => ansichtSetzen('nachweise'));
+  $('tab-stundenkonto').addEventListener('click', () => ansichtSetzen('stundenkonto'));
+  $('reiter').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const a = state.ansicht === 'nachweise' ? 'stundenkonto' : 'nachweise';
+    ansichtSetzen(a);
+    $(a === 'nachweise' ? 'tab-nachweise' : 'tab-stundenkonto').focus();
+  });
   $('btn-speichern').addEventListener('click', speichern);
   $('btn-leeren').addEventListener('click', () => {
     state.dateien = [];
@@ -677,7 +702,7 @@ export function starte(p) {
     if (!mod) return;
     const k = e.key.toLowerCase();
     if (k === 'o') { e.preventDefault(); oeffnen(); }
-    if (k === 's') { e.preventDefault(); speichern(); }
+    if (k === 's') { e.preventDefault(); if (state.ansicht === 'nachweise') speichern(); }
   });
 
   if (window.ResizeObserver) {

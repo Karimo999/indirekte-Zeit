@@ -53,7 +53,7 @@ try {
   await wd('POST', `${S}/window/rect`, { width: 1280, height: 800 }).catch(() => {});
   await sleep(2500);
 
-  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.4.0', 'Version aus der App');
+  pruefe((await js('return document.getElementById("version").textContent')) === 'Version 1.5.0', 'Version aus der App');
   await bild('1-start.png');
   // die App merkt sich den Standort – fuer den Test immer mit Segeberg beginnen
   await js('document.getElementById("st-segeberg").click()');
@@ -70,7 +70,7 @@ try {
   console.log(zeilen.join('\n'));
   pruefe(zeilen.length === 7, `7 Nachweise aus Ordner, Unterordner und ZIP (${zeilen.length})`);
   pruefe(zeilen.some((z) => z.includes('Begleitkind_Oktober.pdf') && z.includes('1,40') && z.includes('32,23')), 'Oktober 1,40 / 32,23');
-  pruefe(zeilen.some((z) => z.includes('kein Platz')), 'Fehlerfall angezeigt');
+  pruefe(zeilen.some((z) => z.startsWith('Langer, Paul') && z.includes('Nicht eingetragen')), 'Fehlerfall angezeigt');
   const status = await js('return document.getElementById("status").textContent');
   console.log('Status:', status);
   await sleep(1500);
@@ -116,8 +116,8 @@ try {
   pruefe(zp.some((z) => z.includes('Begleitkind_Oktober.pdf') && z.includes('6,17') && z.includes('37,00')), 'Pinneberg 6,17 / 37,00');
   await bild('5-pinneberg.png');
 
-  // Ansicht Mitarbeiter (Werte fuer das Stundenkonto)
-  await js('document.getElementById("ans-mitarbeiter").click()');
+  // Reiter Stundenkonto (Werte je Mitarbeiter)
+  await js('document.getElementById("tab-stundenkonto").click()');
   await sleep(800);
   const ma = await js('return [...document.querySelectorAll(".zeile")].map((z) => z.innerText.replace(/\\s*\\n+\\s*/g, " | "))');
   console.log(ma.join('\n'));
@@ -126,7 +126,7 @@ try {
   await bild('6-mitarbeiter.png');
 
   // eine Datei: „Speichern unter“ – Original darf nicht ueberschrieben werden
-  await js('document.getElementById("ans-nachweise").click(); document.getElementById("btn-leeren").click()');
+  await js('document.getElementById("tab-nachweise").click(); document.getElementById("btn-leeren").click()');
   const einzeln = join(ORDNER, 'Begleitkind_Oktober.pdf');
   await jsAsync(`const fertig = arguments[arguments.length - 1];
     window.__TAURI__.event.emitTo({ kind: 'Webview', label: 'main' }, 'tauri://drag-drop', { paths: [arguments[0]], position: { x: 1, y: 1 } }).then(() => fertig('ok'));`, [einzeln]);

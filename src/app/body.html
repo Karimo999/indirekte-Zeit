@@ -1,13 +1,14 @@
 <div class="app">
   <header class="kopf">
     <div class="standort">
-      <div class="umschalter" role="radiogroup" aria-label="Standort" id="standort">
+      <span class="beschriftung" id="standort-label">Standort</span>
+      <div class="umschalter" role="radiogroup" aria-labelledby="standort-label" id="standort">
         <button type="button" role="radio" aria-checked="true" data-standort="segeberg" id="st-segeberg">Segeberg</button>
         <button type="button" role="radio" aria-checked="false" data-standort="pinneberg" id="st-pinneberg">Pinneberg</button>
       </div>
       <span class="regel" id="regel"></span>
     </div>
-    <button type="button" class="knopf" id="btn-oeffnen">Dateien öffnen …</button>
+    <button type="button" class="knopf" id="btn-oeffnen" hidden>Dateien öffnen …</button>
   </header>
 
   <div class="update" id="update" hidden>
@@ -15,24 +16,28 @@
     <button type="button" class="knopf" id="btn-update">Jetzt aktualisieren</button>
   </div>
 
+  <nav class="reiter" id="reiter" role="tablist" aria-label="Ansicht" hidden>
+    <button type="button" role="tab" aria-selected="true" id="tab-nachweise">Leistungsnachweise<span class="anzahl" id="anz-nachweise"></span></button>
+    <button type="button" role="tab" aria-selected="false" id="tab-stundenkonto">Stundenkonto<span class="anzahl" id="anz-stundenkonto"></span></button>
+  </nav>
+
   <main class="inhalt">
     <section class="leer" id="leer">
-      <p class="leer-titel">Leistungsnachweise hierher ziehen</p>
-      <p class="leer-text">Leistungsnachweise (PDF), Zeitnachweise der Mitarbeiter (Excel), ein Ordner oder die ZIP-Datei aus Kilanka</p>
+      <p class="leer-titel">Dateien hierher ziehen</p>
+      <button type="button" class="knopf haupt" id="btn-oeffnen-leer">Dateien öffnen …</button>
+      <dl class="leer-arten">
+        <dt>Leistungsnachweis (PDF)</dt>
+        <dd>Die App trägt die indirekten Stunden und die Gesamtstunden ein.</dd>
+        <dt>Zeitnachweis (Excel)</dt>
+        <dd>Die App berechnet die indirekte Zeit für das Stundenkonto in Kilanka.</dd>
+      </dl>
+      <p class="leer-text">Ganze Ordner und ZIP-Dateien aus Kilanka gehen auch.</p>
     </section>
 
     <section class="arbeit" id="arbeit" hidden>
-      <div class="liste">
-        <div class="liste-leiste">
-          <div class="umschalter klein" role="radiogroup" aria-label="Ansicht">
-            <button type="button" role="radio" aria-checked="true" id="ans-nachweise">Nachweise</button>
-            <button type="button" role="radio" aria-checked="false" id="ans-mitarbeiter">Mitarbeiter</button>
-          </div>
-        </div>
-        <div class="liste-kopf" aria-hidden="true">
-          <span id="kopf-name">Nachweis</span><span>Direkt</span><span>Indirekt</span><span>Gesamt</span>
-        </div>
-        <div class="liste-inhalt" id="liste" role="listbox" aria-label="Nachweise"></div>
+      <div class="liste" id="liste-bereich">
+        <div class="liste-kopf" id="liste-kopf" aria-hidden="true"></div>
+        <div class="liste-inhalt" id="liste" role="listbox" aria-label="Liste"></div>
       </div>
       <div class="detail">
         <div class="detail-kopf" id="detail-kopf"></div>
@@ -47,7 +52,7 @@
     <button type="button" class="link" id="btn-zeigen" hidden>Im Ordner zeigen</button>
     <span class="version" id="version"></span>
     <button type="button" class="knopf" id="btn-leeren" hidden>Liste leeren</button>
-    <button type="button" class="knopf haupt" id="btn-speichern" disabled>Speichern</button>
+    <button type="button" class="knopf haupt" id="btn-speichern" hidden disabled>Speichern</button>
   </footer>
 </div>
 <input type="file" id="datei-eingabe" multiple accept=".pdf,.zip,.xlsx,application/pdf,application/zip,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>

@@ -18,23 +18,22 @@ zwei Nachkommastellen, kaufmännisch gerundet.
 
 ## Bedienung
 
-1. Standort wählen.
-2. PDF-Dateien, einen Ordner oder die ZIP-Datei aus Kilanka ins Fenster ziehen (oder „Dateien öffnen …“).
-3. Werte prüfen, **Speichern …**: Bei einer Datei öffnet sich „Speichern unter“, bei mehreren wählst du den
-   Ordner. Die ergänzten Dateien heißen `…_ergaenzt.pdf`; gibt es eine Datei dort schon, fragt die App vor dem
-   Ersetzen. Der zuletzt gewählte Ordner wird beim nächsten Mal vorgeschlagen. Das Original wird nie überschrieben.
-
-4. **Mitarbeiter** (Umschalter über der Liste): indirekte Stunden je betreuender Fachkraft und Monat, summiert
-   über alle geladenen Nachweise. Diese Werte gehören ins Stundenkonto in Kilanka, als manuelle Buchung:
-   **Mitarbeiter → Konten → Stundenkonto → Plus** (Stichtag, Buchungswert, Bemerkung; die App zeigt alle drei
-   zum Kopieren). Derselbe Nachweis in mehreren Dateien wird nur einmal gezählt.
-
-5. **Zeitnachweise (Excel):** Den Zeitnachweis eines Mitarbeiters aus Kilanka (Excel-Export) einfach mit
-   ablegen. Die App zählt alle Einträge mit Klient (ein Eintrag mit Klient ist ein Klienteneinsatz) und rechnet
-   die indirekten Stunden nach den Regeln des Standorts (Segeberg: 12 Min. pro Eintrag mit Klient; Pinneberg:
-   20 % je Klient, Obergrenze je Klient und für den Mitarbeiter insgesamt). Das Ergebnis
-   steht unter **Mitarbeiter**, mit Stichtag, Buchungswert und Bemerkung zum Kopieren. Ist für denselben
-   Mitarbeiter und Monat auch ein Leistungsnachweis geladen, zählt nur der Zeitnachweis.
+1. Oben den **Standort** wählen.
+2. Dateien ins Fenster ziehen oder **Dateien öffnen …**: Leistungsnachweise (PDF), Zeitnachweise der
+   Mitarbeiter (Excel), ganze Ordner oder die ZIP-Datei aus Kilanka.
+3. Reiter **Leistungsnachweise**: Werte prüfen (rechts die Vorschau), dann **Speichern …**. Bei einer Datei
+   öffnet sich „Speichern unter“, bei mehreren wählst du den Ordner. Die ergänzten Dateien heißen
+   `…_ergaenzt.pdf`; gibt es eine Datei dort schon, fragt die App vor dem Ersetzen. Das Original wird nie
+   überschrieben.
+4. Reiter **Stundenkonto**: die indirekte Zeit je Mitarbeiter und Monat, mit Stichtag, Buchungswert und
+   Bemerkung zum Kopieren. In Kilanka als manuelle Buchung eintragen: **Mitarbeiter → Konten →
+   Stundenkonto → Plus**.
+   - Aus Zeitnachweisen (Excel) zählen alle Einträge mit Klient (ein Eintrag mit Klient ist ein
+     Klienteneinsatz). Segeberg: 12 Min. pro Eintrag mit Klient. Pinneberg: 20 % je Klient,
+     Obergrenze je Klient und für den Mitarbeiter insgesamt.
+   - Aus Leistungsnachweisen zählt die betreuende Fachkraft im Nachweis. Ist für denselben Mitarbeiter und
+     Monat auch ein Zeitnachweis geladen, zählt nur der Zeitnachweis. Derselbe Nachweis in mehreren Dateien
+     zählt einmal.
 
 Kilanka lässt von außen keine Buchungen zu (API und Applets können nur lesen), deshalb ist dieser Schritt
 manuell: eine Buchung pro Mitarbeiter und Monat.

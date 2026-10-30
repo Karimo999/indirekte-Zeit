@@ -118,6 +118,12 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     await page.goto('http://localhost:8766/');
     await page.waitForTimeout(600);
     await page.screenshot({ path: path.join(OUT, `${schema}-1-leer.png`) });
+    // Startbildschirm: ein Knopf in der Mitte, keine Reiter, kein Speichern
+    pruefe(await page.isVisible('#btn-oeffnen-leer') && await page.isHidden('#btn-oeffnen') && await page.isHidden('#reiter') && await page.isHidden('#btn-speichern'), 'Startbildschirm aufgeräumt');
+    await page.evaluate(() => { window.__mock.naechsteAuswahl = null; });
+    await page.click('#btn-oeffnen-leer');
+    await page.waitForTimeout(200);
+    pruefe((await page.evaluate(() => window.__mock.auswahl.length)) === 1, '„Dateien öffnen …“ in der Mitte öffnet den Dialog');
     if (schema === 'light') {
       await page.waitForTimeout(2000);
       pruefe(await page.isVisible('#update'), 'Update-Hinweis sichtbar');
@@ -139,8 +145,9 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     const z = await zeilen(page);
     console.log(z.join('\n'));
     pruefe(z.length === 10, `10 Nachweise in der Liste (${z.length})`);
+    pruefe(await page.isVisible('#reiter') && await page.isVisible('#btn-oeffnen') && (await page.textContent('#anz-nachweise')) === '10', 'Reiter und „Dateien öffnen …“ oben sichtbar');
     pruefe(z[0].includes('1,40') && z[0].includes('32,23'), 'Oktober: 1,40 / 32,23');
-    pruefe(z.some((x) => x.includes('Unter der Tabelle ist kein Platz')), 'Fehlerfall „kein Platz“ angezeigt');
+    pruefe(z.some((x) => x.startsWith('Langer, Paul') && x.includes('Nicht eingetragen')), 'Fehlerfall in der Liste kurz markiert');
     pruefe((await page.textContent('#status')).includes('Notiz.docx'), 'falsche Datei gemeldet');
     await page.waitForTimeout(1500);
     await page.screenshot({ path: path.join(OUT, `${schema}-3-liste.png`) });
@@ -154,10 +161,12 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     pruefe(leinwand, 'Vorschau gezeichnet');
 
     // Fehlerzeile anklicken
-    const idx = z.findIndex((x) => x.includes('kein Platz'));
+    const idx = z.findIndex((x) => x.includes('Nicht eingetragen'));
     await page.click(`.zeile >> nth=${idx}`);
     await page.waitForTimeout(1200);
     await page.screenshot({ path: path.join(OUT, `${schema}-5-fehler.png`) });
+    const fk = await page.textContent('#detail-kopf');
+    pruefe(fk.includes('Unter der Tabelle ist kein Platz') && fk.includes('Indirekt 4,80 Std. · Gesamt 140,55 Std.'), 'Detail nennt Grund und Werte zum Eintragen von Hand');
 
     // Speichern: mehrere Dateien -> Ordner waehlen
     const vorher = await page.textContent('#btn-speichern');
@@ -195,23 +204,24 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     await page.screenshot({ path: path.join(OUT, `${schema}-6-gespeichert.png`) });
 
     // Ansicht „Mitarbeiter“: indirekte Stunden je Fachkraft und Monat fuer das Stundenkonto
-    await page.click('#ans-mitarbeiter');
+    await page.click('#tab-stundenkonto');
     await page.waitForTimeout(300);
     const ma = await zeilen(page);
     console.log('MITARBEITER:\n' + ma.join('\n'));
     pruefe(ma.length === 5, `5 Gruppen Mitarbeiter/Monat (${ma.length})`);
-    pruefe(ma[0].startsWith('Begleiterin, Anna | Februar 2026 · 1 Nachweis') && ma[0].includes('3,00'), 'Begleiterin Februar 3,00');
-    pruefe(ma[2].startsWith('Fachkraft, Tina | April 2026 · 2 Nachweise') && ma[2].includes('11,20'), 'Tina April 11,20 (inkl. nicht eingetragenem Nachweis)');
+    pruefe(ma[0] === 'Begleiterin, Anna | Februar 2026 · aus dem Leistungsnachweis | 3,00', 'Begleiterin Februar 3,00 (nur der indirekte Wert)');
+    pruefe(ma[2] === 'Fachkraft, Tina | April 2026 · aus 2 Leistungsnachweisen | 11,20', 'Tina April 11,20 (inkl. nicht eingetragenem Nachweis)');
     // Nachweis_Oktober, Sammel (3. Nachweis) und Nur_lesen enthalten denselben Nachweis -> nur einmal zaehlen
     const okt = ma.findIndex((z) => z.startsWith('Schulbegleiter, Max | Oktober 2026'));
-    pruefe(okt >= 0 && ma[okt].includes('1,40') && ma[okt].includes('1 Nachweis'), 'Max Oktober 1,40, doppelte Nachweise nur einmal');
-    pruefe(ma.some((z) => z.startsWith('Schulbegleiter, Max | September 2026 · 1 Nachweis') && z.includes('3,80')), 'Max September 3,80');
+    pruefe(okt >= 0 && ma[okt] === 'Schulbegleiter, Max | Oktober 2026 · aus dem Leistungsnachweis | 1,40', 'Max Oktober 1,40, doppelte Nachweise nur einmal');
+    pruefe(ma.includes('Schulbegleiter, Max | September 2026 · aus dem Leistungsnachweis | 3,80'), 'Max September 3,80');
     await page.click(`.zeile >> nth=${okt}`);
     await page.waitForTimeout(200);
     const buchung = await page.$$eval('.buchung tr', (trs) => trs.map((t) => [...t.children].slice(0, 2).map((c) => c.textContent).join('=')));
     console.log('BUCHUNG: ' + buchung.join(' | '));
     pruefe(buchung.join('|') === 'Stichtag=31.10.2026|Buchungswert=1,40|Bemerkung=Indirekte Zeit Oktober 2026', 'Werte für die manuelle Buchung');
-    pruefe((await page.textContent('#ma-detail')).includes('nur einmal gezählt'), 'doppelte Nachweise werden genannt');
+    pruefe((await page.textContent('#ma-detail')).includes('zählt nur einmal'), 'doppelte Nachweise werden genannt');
+    pruefe(await page.isHidden('#btn-speichern'), 'kein Speichern-Knopf im Reiter Stundenkonto');
     pruefe(await page.isHidden('#vorschau'), 'Vorschau in der Mitarbeiter-Ansicht ausgeblendet');
     pruefe((await page.textContent('#status')).includes('Mitarbeiter'), 'Status zeigt Mitarbeiter-Summe');
     await page.click('.buchung tr:nth-child(2) .link');
@@ -219,7 +229,7 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     const kopiert = await page.textContent('.buchung tr:nth-child(2) .link');
     pruefe(kopiert === 'Kopiert' || kopiert === 'Nicht möglich', `Kopieren-Knopf reagiert (${kopiert})`);
     await page.screenshot({ path: path.join(OUT, `${schema}-6b-mitarbeiter.png`) });
-    await page.click('#ans-nachweise');
+    await page.click('#tab-nachweise');
     await page.waitForTimeout(800);
     pruefe((await zeilen(page)).length === 10, 'zurück zur Nachweis-Ansicht');
 
@@ -229,14 +239,14 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     const zp = await zeilen(page);
     pruefe(zp[0].includes('6,17') && zp[0].includes('37,00'), 'Pinneberg: 6,17 / 37,00');
     // Pinneberg-Grenze auch je Mitarbeiter: Tina hat zwei Nachweise (14,14 + 19,29) im Zeitraum 02.03.–15.04.
-    await page.click('#ans-mitarbeiter');
+    await page.click('#tab-stundenkonto');
     await page.waitForTimeout(300);
     const zpm = await zeilen(page);
     const tina = zpm.findIndex((z) => z.startsWith('Fachkraft, Tina'));
     pruefe(tina >= 0 && zpm[tina].includes('19,29'), `Pinneberg: Grenze je Mitarbeiter (${zpm[tina]})`);
     await page.click(`.zeile >> nth=${tina}`);
-    pruefe((await page.textContent('#ma-detail')).includes('Zusammen 33,43 Std. – für den Mitarbeiter höchstens 19,29 Std.'), 'Hinweis auf die Grenze je Mitarbeiter');
-    await page.click('#ans-nachweise');
+    pruefe((await page.textContent('#ma-detail')).includes('zusammen 33,43 Std., höchstens 19,29 Std.'), 'Hinweis auf die Grenze je Mitarbeiter');
+    await page.click('#tab-nachweise');
     await page.waitForTimeout(600);
     pruefe(!(await page.isDisabled('#btn-speichern')), 'nach Standortwechsel wieder speicherbar');
     await page.screenshot({ path: path.join(OUT, `${schema}-7-pinneberg.png`) });
@@ -280,14 +290,17 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     await page.click('#btn-leeren');
     await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Muster_Mia.xlsx']);
     await page.waitForTimeout(800);
-    pruefe((await page.getAttribute('#ans-mitarbeiter', 'aria-checked')) === 'true', 'nur Excel abgelegt -> Ansicht Mitarbeiter');
+    pruefe((await page.getAttribute('#tab-stundenkonto', 'aria-selected')) === 'true', 'nur Excel abgelegt -> Reiter Stundenkonto');
+    pruefe((await page.textContent('#anz-nachweise')) === '0' && (await page.textContent('#anz-stundenkonto')) === '1', 'Anzahl in den Reitern');
     let zx = await zeilen(page);
     console.log('EXCEL:\n' + zx.join('\n'));
-    pruefe(zx.length === 1 && zx[0].startsWith('Muster, Mia | September 2026 · Zeitnachweis') && zx[0].includes('1,80'), 'Zeitnachweis Segeberg 1,80 (12 Min. pro Eintrag mit Klient)');
+    pruefe(zx.length === 1 && zx[0] === 'Muster, Mia | September 2026 · aus dem Zeitnachweis | 1,80', 'Zeitnachweis Segeberg 1,80 (12 Min. pro Eintrag mit Klient)');
     let bx = await page.$$eval('.buchung tr', (trs) => trs.map((t) => [...t.children].slice(0, 2).map((c) => c.textContent).join('=')));
     pruefe(bx.join('|') === 'Stichtag=30.09.2026|Buchungswert=1,80|Bemerkung=Indirekte Zeit September 2026', 'Buchungswerte aus dem Zeitnachweis');
     const mdx = await page.textContent('#ma-detail');
-    pruefe(mdx.includes('Kind, Anton · 1,20 Std.') && mdx.includes('6 Einträge × 12 Min.') && mdx.includes('Kind, Berta · 0,60 Std.') && mdx.includes('3 Einträge ohne Klient'), 'Aufschlüsselung je Klient');
+    const rx = await page.$$eval('.rechnung tr', (trs) => trs.map((t) => t.innerText.replace(/\s*\n+\s*/g, ' | ').replace(/\t/g, ' | ')));
+    console.log('RECHNUNG: ' + rx.join(' || '));
+    pruefe(rx.length === 2 && rx[0] === 'Kind, Anton | 6 Einträge × 12 Min. | 1,20 Std.' && rx[1] === 'Kind, Berta | 3 Einträge × 12 Min. | 0,60 Std.' && mdx.includes('3 Einträge ohne Klient'), 'Aufschlüsselung je Klient');
     await page.screenshot({ path: path.join(OUT, `${schema}-9-zeitnachweis.png`) });
     await page.click('#st-pinneberg');
     await page.waitForTimeout(300);
@@ -297,18 +310,18 @@ const zeilen = (page) => page.$$eval('.zeile', (zs) => zs.map((z) => z.innerText
     await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Volker.xlsx']);
     await page.waitForTimeout(600);
     zx = await zeilen(page);
-    pruefe(zx[0].startsWith('Viel, Volker') && zx[0].includes('13,02') && (await page.textContent('#ma-detail')).includes('Zusammen 26,04 Std.'), 'Zeitnachweis Pinneberg: Grenze für den Mitarbeiter (26,04 → 13,02)');
+    pruefe(zx[0].startsWith('Viel, Volker') && zx[0].includes('13,02') && (await page.textContent('#ma-detail')).includes('zusammen 26,04 Std.'), 'Zeitnachweis Pinneberg: Grenze für den Mitarbeiter (26,04 → 13,02)');
     await page.click('#btn-leeren');
     await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Muster_Mia.xlsx']);
     await page.waitForTimeout(600);
     await page.click('#st-segeberg');
-    await page.click('#ans-nachweise');
+    await page.click('#tab-nachweise');
     pruefe((await page.textContent('#liste')).includes('Keine Leistungsnachweise geladen'), 'Nachweis-Ansicht weist auf die Zeitnachweise hin');
     // Zeitnachweis und Leistungsnachweis desselben Mitarbeiters im selben Monat -> nur der Zeitnachweis zaehlt
     await ablegen(page, ['C:\\Users\\Moritz\\Downloads\\Max_September.pdf', 'C:\\Users\\Moritz\\Downloads\\Zeitnachweis_Max.xlsx', 'C:\\Users\\Moritz\\Downloads\\Tabelle.xlsx']);
     await page.waitForTimeout(800);
     pruefe((await page.textContent('#status')).includes('Tabelle.xlsx'), 'kaputte Excel-Datei gemeldet');
-    await page.click('#ans-mitarbeiter');
+    await page.click('#tab-stundenkonto');
     await page.waitForTimeout(300);
     zx = await zeilen(page);
     console.log(zx.join('\n'));
